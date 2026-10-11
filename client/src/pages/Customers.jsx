@@ -9,6 +9,10 @@ export default function Customers() {
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [form, setForm] = useState({ name: '', phone: '', address: '' });
+  const [saving, setSaving] = useState(false);
+
   function load(query = '') {
     api.get(`/api/customers${query ? `?q=${encodeURIComponent(query)}` : ''}`)
       .then(setCustomers).catch(e => setError(e.message));
@@ -20,14 +24,25 @@ export default function Customers() {
     setSelected(full);
   }
 
-  async function quickAdd() {
-    const name = prompt('Customer name:');
-    if (!name) return;
-    const phone = prompt('Phone (optional):') || '';
+  async function handleAddCustomer(e) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setSaving(true);
+    setError('');
     try {
-      await api.post('/api/customers', { name, phone });
+      await api.post('/api/customers', {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim()
+      });
+      setShowAddModal(false);
+      setForm({ name: '', phone: '', address: '' });
       load(q);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function collectDue(c) {
@@ -47,7 +62,11 @@ export default function Customers() {
         <input placeholder="Search name / phone…" value={q}
           onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && load(q)} />
         <button className="btn" onClick={() => load(q)}>Search</button>
-        <button className="btn btn-primary" onClick={quickAdd}>＋ Add customer</button>
+        <button className="btn btn-primary" onClick={() => {
+          setForm({ name: '', phone: '', address: '' });
+          setError('');
+          setShowAddModal(true);
+        }}>＋ Add customer</button>
       </div>
       {error && <div className="error">{error}</div>}
 
@@ -75,7 +94,7 @@ export default function Customers() {
 
         {selected && (
           <div className="card">
-            <h3>{selected.name} — ledger</h3>
+            <h3>{selected.name}{selected.phone ? ` ${selected.phone}` : ''} — ledger</h3>
             <p className="muted">Purchases: {fmtMoney(selected.total_purchases)} · Payments: {fmtMoney(selected.total_payments)} · Due: <strong className="warn">{fmtMoney(selected.outstanding_due)}</strong></p>
             <h4>Invoices</h4>
             <table>
@@ -98,6 +117,61 @@ export default function Customers() {
           </div>
         )}
       </div>
+
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Add New Customer</h2>
+              <button type="button" className="btn-link" onClick={() => setShowAddModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleAddCustomer}>
+              <label>
+                Customer Name *
+                <input
+                  required
+                  autoFocus
+                  placeholder="e.g. Rahim or Rahim 01700000000"
+                  value={form.name}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!form.phone) {
+                      const match = val.match(/^(.*?)\s+([+0-9\-()]{7,20})$/);
+                      if (match) {
+                        setForm({ ...form, name: match[1], phone: match[2] });
+                        return;
+                      }
+                    }
+                    setForm({ ...form, name: val });
+                  }}
+                />
+              </label>
+              <label>
+                Phone Number
+                <input
+                  placeholder="e.g. 01700000000"
+                  value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value })}
+                />
+              </label>
+              <label>
+                Address (Optional)
+                <input
+                  placeholder="e.g. Mirpur, Dhaka"
+                  value={form.address}
+                  onChange={e => setForm({ ...form, address: e.target.value })}
+                />
+              </label>
+              <div className="modal-foot">
+                <button type="button" className="btn" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save Customer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

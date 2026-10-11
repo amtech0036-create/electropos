@@ -8,7 +8,7 @@ r.use(requireAuth);
 // Get serials for a specific product
 r.get('/products/:id/serials', requirePermission('product.view'), (req, res) => {
   const { status = 'all' } = req.query;
-  let sql = `SELECT ps.*, s.invoice_no, c.name AS customer_name FROM product_serials ps
+  let sql = `SELECT ps.*, s.invoice_no, c.name AS customer_name, c.phone AS customer_phone FROM product_serials ps
     LEFT JOIN sales s ON s.id = ps.sale_id
     LEFT JOIN customers c ON c.id = s.customer_id
     WHERE ps.product_id = ?`;

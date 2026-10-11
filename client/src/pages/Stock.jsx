@@ -289,7 +289,7 @@ export default function Stock() {
                     </span>
                   </td>
                   <td>{s.invoice_no ? <a href={`/sales/${s.sale_id}`}>{s.invoice_no}</a> : '—'}</td>
-                  <td>{s.customer_name || '—'}</td>
+                  <td>{s.customer_name ? `${s.customer_name}${s.customer_phone ? ` ${s.customer_phone}` : ''}` : '—'}</td>
                   <td className="muted" style={{ maxWidth: '180px' }}>{s.notes || '—'}</td>
                 </tr>
               ))}

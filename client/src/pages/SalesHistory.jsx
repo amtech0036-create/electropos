@@ -171,7 +171,7 @@ export default function SalesHistory() {
                 <tr key={s.id} className={s.status === 'cancelled' ? 'cancelled' : ''}>
                   <td><strong>{s.invoice_no}</strong></td>
                   <td className="muted">{fmtDate(s.created_at)}</td>
-                  <td>{s.customer_name}</td>
+                  <td>{s.customer_name}{s.customer_phone ? ` ${s.customer_phone}` : ''}</td>
                   <td>{s.cashier_name}</td>
                   <td className="num">{fmtMoney(s.total)}</td>
                   <td className="num">{fmtMoney(s.paid)}</td>
@@ -222,7 +222,7 @@ export default function SalesHistory() {
                   <td><strong>{r.return_no}</strong></td>
                   <td className="muted">{fmtDate(r.created_at)}</td>
                   <td><Link to={`/sales/${r.sale_id}`}>{r.invoice_no}</Link></td>
-                  <td>{r.customer_name}</td>
+                  <td>{r.customer_name}{r.customer_phone ? ` ${r.customer_phone}` : ''}</td>
                   <td>{r.cashier_name}</td>
                   <td className="num" style={{ color: '#dc2626', fontWeight: 600 }}>
                     {fmtMoney(r.total_refund)}
@@ -253,7 +253,7 @@ export default function SalesHistory() {
             <form onSubmit={handleReturnSubmit}>
               <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Customer: <strong>{eligibility.sale.customer_name}</strong></span>
+                  <span>Customer: <strong>{eligibility.sale.customer_name}{eligibility.sale.customer_phone ? ` ${eligibility.sale.customer_phone}` : ''}</strong></span>
                   <span>Sale Total: <strong>{fmtMoney(eligibility.sale.total)}</strong></span>
                   <span>Outstanding Due: <strong>{fmtMoney(eligibility.sale.due)}</strong></span>
                 </div>
@@ -359,7 +359,7 @@ export default function SalesHistory() {
               <div className="two-col" style={{ marginBottom: '16px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                 <div>
                   <div>Original Invoice: <strong>{viewReturnDetail.invoice_no}</strong></div>
-                  <div>Customer: <strong>{viewReturnDetail.customer_name}</strong> ({viewReturnDetail.customer_phone || 'No phone'})</div>
+                  <div>Customer: <strong>{viewReturnDetail.customer_name}{viewReturnDetail.customer_phone ? ` ${viewReturnDetail.customer_phone}` : ''}</strong></div>
                   <div>Date: <strong>{fmtDate(viewReturnDetail.created_at)}</strong></div>
                 </div>
                 <div>

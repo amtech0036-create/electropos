@@ -9,6 +9,10 @@ export default function POS() {
   const [cart, setCart] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(1);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [newCust, setNewCust] = useState({ name: '', phone: '', address: '' });
+  const [custSaving, setCustSaving] = useState(false);
+  const [custError, setCustError] = useState('');
   const [invoiceDiscount, setInvoiceDiscount] = useState(0);
   const [method, setMethod] = useState('cash');
   const [paidAmount, setPaidAmount] = useState('');
@@ -343,15 +347,18 @@ export default function POS() {
       <div className="pos-right card">
         <label>Customer
           <select value={customerId} onChange={e => setCustomerId(Number(e.target.value))}>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` (${c.phone})` : ''}</option>)}
+            {customers.map(c => <option key={c.id} value={c.id}>{c.name}{c.phone ? ` ${c.phone}` : ''}</option>)}
           </select>
         </label>
-        <button className="btn btn-link" onClick={async () => {
-          const name = prompt('Quick add customer name:');
-          if (!name) return;
-          const c = await api.post('/api/customers', { name });
-          const list = await api.get('/api/customers');
-          setCustomers(list); setCustomerId(c.id);
+        {customers.find(c => c.id === customerId)?.phone && (
+          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '-6px', marginBottom: '8px' }}>
+            📞 {customers.find(c => c.id === customerId).phone}
+          </div>
+        )}
+        <button type="button" className="btn btn-link" onClick={() => {
+          setNewCust({ name: '', phone: '', address: '' });
+          setCustError('');
+          setShowAddCustomer(true);
         }}>＋ Quick add customer</button>
 
         <label>Invoice discount (৳)
@@ -385,6 +392,86 @@ export default function POS() {
           {busy ? 'Saving…' : `Confirm sale — ${fmtMoney(total)}`}
         </button>
       </div>
+
+      {showAddCustomer && (
+        <div className="modal-overlay" onClick={() => setShowAddCustomer(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <h2>Quick Add Customer</h2>
+              <button type="button" className="btn-link" onClick={() => setShowAddCustomer(false)}>✕</button>
+            </div>
+            {custError && <div className="error" style={{ marginBottom: '12px' }}>{custError}</div>}
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newCust.name.trim()) {
+                setCustError('Customer name is required');
+                return;
+              }
+              setCustSaving(true);
+              setCustError('');
+              try {
+                const created = await api.post('/api/customers', {
+                  name: newCust.name.trim(),
+                  phone: newCust.phone.trim(),
+                  address: newCust.address.trim()
+                });
+                const list = await api.get('/api/customers');
+                setCustomers(list);
+                setCustomerId(created.id);
+                setShowAddCustomer(false);
+                setNewCust({ name: '', phone: '', address: '' });
+              } catch (err) {
+                setCustError(err.message || 'Failed to add customer');
+              } finally {
+                setCustSaving(false);
+              }
+            }}>
+              <label>
+                Customer Name *
+                <input
+                  required
+                  autoFocus
+                  placeholder="e.g. Rahim or Rahim 01700000000"
+                  value={newCust.name}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (!newCust.phone) {
+                      const match = val.match(/^(.*?)\s+([+0-9\-()]{7,20})$/);
+                      if (match) {
+                        setNewCust({ ...newCust, name: match[1], phone: match[2] });
+                        return;
+                      }
+                    }
+                    setNewCust({ ...newCust, name: val });
+                  }}
+                />
+              </label>
+              <label>
+                Phone Number
+                <input
+                  placeholder="e.g. 01700000000"
+                  value={newCust.phone}
+                  onChange={e => setNewCust({ ...newCust, phone: e.target.value })}
+                />
+              </label>
+              <label>
+                Address (Optional)
+                <input
+                  placeholder="e.g. Mirpur, Dhaka"
+                  value={newCust.address}
+                  onChange={e => setNewCust({ ...newCust, address: e.target.value })}
+                />
+              </label>
+              <div className="modal-foot">
+                <button type="button" className="btn" onClick={() => setShowAddCustomer(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={custSaving}>
+                  {custSaving ? 'Saving…' : 'Save & Select'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

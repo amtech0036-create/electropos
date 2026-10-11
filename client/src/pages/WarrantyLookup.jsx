@@ -231,7 +231,7 @@ export default function WarrantyLookup() {
             <form onSubmit={handleAddServiceLog}>
               <div style={{ background: '#f8fafc', padding: '10px', borderRadius: '6px', marginBottom: '12px', fontSize: '0.9rem' }}>
                 <div>Device: <strong>{logModalUnit.imei_1 ? `IMEI: ${logModalUnit.imei_1}` : `SN: ${logModalUnit.serial_no}`}</strong></div>
-                {logModalUnit.customer_name && <div>Customer: <strong>{logModalUnit.customer_name}</strong></div>}
+                {logModalUnit.customer_name && <div>Customer: <strong>{logModalUnit.customer_name}{logModalUnit.customer_phone ? ` ${logModalUnit.customer_phone}` : ''}</strong></div>}
               </div>
 
               <label>

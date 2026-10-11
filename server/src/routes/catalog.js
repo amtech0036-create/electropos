@@ -239,10 +239,23 @@ r.get('/customers', (req, res) => {
 });
 
 r.post('/customers', (req, res) => {
-  const { name, phone = '', address = '' } = req.body || {};
+  let { name = '', phone = '', address = '' } = req.body || {};
+  name = typeof name === 'string' ? name.trim() : '';
+  phone = typeof phone === 'string' ? phone.trim() : '';
+  address = typeof address === 'string' ? address.trim() : '';
   if (!name) return res.status(400).json({ error: 'name required' });
+
+  // If phone was not provided separately, check if name contains a phone number at the end, e.g. "Rahim 01700000000"
+  if (!phone) {
+    const match = name.match(/^(.*?)\s+([+0-9\-()]{7,20})$/);
+    if (match) {
+      name = match[1].trim();
+      phone = match[2].trim();
+    }
+  }
+
   const info = db.prepare('INSERT INTO customers (name, phone, address) VALUES (?, ?, ?)').run(name, phone, address);
-  res.json({ id: info.lastInsertRowid });
+  res.json({ id: info.lastInsertRowid, name, phone, address });
 });
 
 r.get('/customers/:id', (req, res) => {

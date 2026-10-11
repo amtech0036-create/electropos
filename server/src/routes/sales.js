@@ -175,13 +175,13 @@ function canDiscount(user, discountMinor) {
 // Sales list with filters
 r.get('/sales', requirePermission('sale.view'), (req, res) => {
   const { from, to, customer_id, q, limit = 100 } = req.query;
-  let sql = `SELECT s.*, cu.name AS customer_name, u.username AS cashier_name FROM sales s
+  let sql = `SELECT s.*, cu.name AS customer_name, cu.phone AS customer_phone, u.username AS cashier_name FROM sales s
     JOIN customers cu ON cu.id = s.customer_id JOIN users u ON u.id = s.user_id WHERE 1=1`;
   const params = [];
   if (from) { sql += " AND date(s.created_at) >= date(?)"; params.push(from); }
   if (to) { sql += " AND date(s.created_at) <= date(?)"; params.push(to); }
   if (customer_id) { sql += ' AND s.customer_id = ?'; params.push(customer_id); }
-  if (q) { sql += ' AND (s.invoice_no LIKE ? OR cu.name LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
+  if (q) { sql += ' AND (s.invoice_no LIKE ? OR cu.name LIKE ? OR cu.phone LIKE ?)'; params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
   sql += ' ORDER BY s.id DESC LIMIT ?';
   params.push(parseInt(limit, 10) || 100);
   const rows = db.prepare(sql).all(...params).map(s => ({

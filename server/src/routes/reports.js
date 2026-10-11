@@ -52,7 +52,7 @@ r.get('/dashboard', (req, res) => {
     FROM products p WHERE p.active = 1 AND p.min_stock_alert > 0
       AND stock <= p.min_stock_alert ORDER BY stock ASC LIMIT 20`).all();
   const productCount = db.prepare('SELECT COUNT(*) AS n FROM products WHERE active = 1').get().n;
-  const recentSales = db.prepare(`SELECT s.id, s.invoice_no, s.total, s.due, s.created_at, c.name AS customer_name
+  const recentSales = db.prepare(`SELECT s.id, s.invoice_no, s.total, s.due, s.created_at, c.name AS customer_name, c.phone AS customer_phone
     FROM sales s JOIN customers c ON c.id = s.customer_id
     WHERE s.status='completed' ORDER BY s.id DESC LIMIT 8`).all().map(s => ({ ...s, total: fromMinor(s.total), due: fromMinor(s.due) }));
   const bestSellers = db.prepare(`SELECT si.product_name, SUM(si.qty) AS qty_sold,

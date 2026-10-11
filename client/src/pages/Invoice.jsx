@@ -46,7 +46,7 @@ export default function Invoice() {
             </div>
           </div>
           <div className="inv-customer">
-            <div><span className="muted">Bill to</span><br /><strong>{sale.customer_name}</strong>{sale.customer_phone ? ` · ${sale.customer_phone}` : ''}</div>
+            <div><span className="muted">Bill to</span><br /><strong>{sale.customer_name}</strong>{sale.customer_phone ? ` ${sale.customer_phone}` : ''}</div>
             <div><span className="muted">Sold by</span><br />{sale.cashier_name}</div>
           </div>
           <table className="inv-table">
@@ -105,7 +105,7 @@ export default function Invoice() {
           <div className="th-sep">--------------------------------</div>
           <div>Invoice: {sale.invoice_no}</div>
           <div>Date: {fmtDate(sale.created_at)}</div>
-          <div>Customer: {sale.customer_name}</div>
+          <div>Customer: {sale.customer_name}{sale.customer_phone ? ` ${sale.customer_phone}` : ''}</div>
           <div className="th-sep">--------------------------------</div>
           {sale.items.map(i => (
             <div key={i.id} className="th-line">

@@ -217,7 +217,7 @@ export default function CashRegister() {
                         <tr key={p.id}>
                           <td className="muted">{fmtDate(p.created_at)}</td>
                           <td>{p.invoice_no || (p.kind === 'collection' ? 'Due Collection' : 'Payment')}</td>
-                          <td>{p.customer_name || 'Walk-in'}</td>
+                          <td>{p.customer_name ? `${p.customer_name}${p.customer_phone ? ` ${p.customer_phone}` : ''}` : 'Walk-in'}</td>
                           <td className="num" style={{ color: p.amount < 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>
                             {p.amount < 0 ? `-${fmtMoney(Math.abs(p.amount))}` : `+${fmtMoney(p.amount)}`}
                           </td>

@@ -116,7 +116,7 @@ export default function Dashboard() {
               {data.recent_sales.map(s => (
                 <tr key={s.id}>
                   <td><Link to={`/sales/${s.id}`}>{s.invoice_no}</Link></td>
-                  <td>{s.customer_name}</td>
+                  <td>{s.customer_name}{s.customer_phone ? ` ${s.customer_phone}` : ''}</td>
                   <td className="num">{fmtMoney(s.total)}</td>
                   <td className="num">{s.due > 0 ? <span className="warn">{fmtMoney(s.due)}</span> : '—'}</td>
                   <td className="muted">{fmtDate(s.created_at)}</td>

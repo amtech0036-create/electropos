@@ -63,7 +63,7 @@ r.get('/register/current', requirePermission('register.view'), (req, res) => {
   const breakdown = calculateLiveCash(session);
 
   // Recent transactions in this shift
-  const payments = db.prepare(`SELECT p.*, s.invoice_no, c.name AS customer_name FROM payments p
+  const payments = db.prepare(`SELECT p.*, s.invoice_no, c.name AS customer_name, c.phone AS customer_phone FROM payments p
     LEFT JOIN sales s ON s.id = p.sale_id
     LEFT JOIN customers c ON c.id = p.customer_id
     WHERE p.method = 'cash' AND p.created_at >= ?

@@ -172,7 +172,7 @@ r.post('/sales/:id/returns', requirePermission('sale.return'), (req, res) => {
 // List all sales returns across store
 r.get('/returns', requirePermission('sale.view'), (req, res) => {
   const { q, limit = 100 } = req.query;
-  let sql = `SELECT r.*, s.invoice_no, c.name AS customer_name, u.username AS cashier_name,
+  let sql = `SELECT r.*, s.invoice_no, c.name AS customer_name, c.phone AS customer_phone, u.username AS cashier_name,
       (SELECT COUNT(*) FROM sale_return_items ri WHERE ri.return_id = r.id) AS item_count
     FROM sale_returns r
     JOIN sales s ON s.id = r.sale_id
@@ -181,8 +181,8 @@ r.get('/returns', requirePermission('sale.view'), (req, res) => {
     WHERE 1=1`;
   const params = [];
   if (q) {
-    sql += ' AND (r.return_no LIKE ? OR s.invoice_no LIKE ? OR c.name LIKE ?)';
-    params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    sql += ' AND (r.return_no LIKE ? OR s.invoice_no LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)';
+    params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
   }
   sql += ' ORDER BY r.id DESC LIMIT ?';
   params.push(parseInt(limit, 10) || 100);
