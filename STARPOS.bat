@@ -11,24 +11,26 @@ where node >nul 2>nul
 if %errorlevel% equ 0 goto node_ready
 
 :: 2. Check if portable Node.js was previously downloaded in .node
-set "NODE_BIN_DIR="
-if exist "%~dp0.node\node.exe" set "NODE_BIN_DIR=%~dp0.node"
-if not defined NODE_BIN_DIR (
-    for /d %%D in ("%~dp0.node\node-*") do (
-        if exist "%%D\node.exe" set "NODE_BIN_DIR=%%D"
+if exist "%~dp0.node\node.exe" (
+    set "PATH=%~dp0.node;!PATH!"
+    goto check_node
+)
+
+for /d %%D in ("%~dp0.node\node-*") do (
+    if exist "%%D\node.exe" (
+        set "PATH=%%D;!PATH!"
+        goto check_node
     )
 )
 
-if defined NODE_BIN_DIR (
-    set "PATH=!NODE_BIN_DIR!;!PATH!"
-    where node >nul 2>nul
-    if %errorlevel% equ 0 goto node_ready
-)
+:check_node
+where node >nul 2>nul
+if %errorlevel% equ 0 goto node_ready
 
 :: 3. Node.js is missing - Auto-download portable Node.js LTS
 echo ========================================================
 echo  [INFO] Node.js was not found in your system PATH.
-echo  [INFO] Auto-downloading portable Node.js LTS (64-bit)...
+echo  [INFO] Auto-downloading portable Node.js LTS...
 echo ========================================================
 echo.
 
@@ -40,10 +42,12 @@ echo Downloading Node.js runtime from nodejs.org...
 where curl >nul 2>nul
 if %errorlevel% equ 0 (
     curl.exe -fL --progress-bar "%NODE_URL%" -o "%NODE_ZIP%"
-) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('%NODE_URL%', '%NODE_ZIP%')"
+    goto check_download
 )
 
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('%NODE_URL%', '%NODE_ZIP%')"
+
+:check_download
 if not exist "%NODE_ZIP%" (
     echo.
     echo [ERROR] Failed to download Node.js automatically.
@@ -57,25 +61,27 @@ echo Extracting Node.js package...
 where tar >nul 2>nul
 if %errorlevel% equ 0 (
     tar -xf "%NODE_ZIP%" -C "%~dp0.node"
-) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%NODE_ZIP%' -DestinationPath '%~dp0.node' -Force"
+    goto finish_extract
 )
 
-:: Clean up temporary zip file
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -Path '%NODE_ZIP%' -DestinationPath '%~dp0.node' -Force"
+
+:finish_extract
 if exist "%NODE_ZIP%" del /f /q "%NODE_ZIP%" >nul 2>nul
 
-:: Configure PATH with the extracted directory
-if exist "%~dp0.node\node.exe" set "NODE_BIN_DIR=%~dp0.node"
-if not defined NODE_BIN_DIR (
-    for /d %%D in ("%~dp0.node\node-*") do (
-        if exist "%%D\node.exe" set "NODE_BIN_DIR=%%D"
+if exist "%~dp0.node\node.exe" (
+    set "PATH=%~dp0.node;!PATH!"
+    goto node_verified
+)
+
+for /d %%D in ("%~dp0.node\node-*") do (
+    if exist "%%D\node.exe" (
+        set "PATH=%%D;!PATH!"
+        goto node_verified
     )
 )
 
-if defined NODE_BIN_DIR (
-    set "PATH=!NODE_BIN_DIR!;!PATH!"
-)
-
+:node_verified
 where node >nul 2>nul
 if %errorlevel% neq 0 (
     echo.
@@ -97,32 +103,36 @@ if not exist "%~dp0server\node_modules" (
     call npm install --silent
 )
 
-:: Verify SQLite driver compatibility by instantiating an in-memory database
+:: Verify SQLite driver compatibility
 node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
-if !errorlevel! neq 0 (
-    echo ========================================================
-    echo  [!] SQLite driver mismatch (compiled for different Node).
-    echo  [!] Automatically configuring database binary for this Node...
-    echo ========================================================
-    echo.
-    if exist "%~dp0server\node_modules\better-sqlite3" (
-        cd /d "%~dp0server\node_modules\better-sqlite3"
-        call npx --yes prebuild-install --force >nul 2>nul
-        cd /d "%~dp0server"
-    )
-    node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
-    if !errorlevel! neq 0 (
-        echo [INFO] Running npm rebuild better-sqlite3...
-        cd /d "%~dp0server"
-        call npm rebuild better-sqlite3
-    )
-    node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
-    if !errorlevel! neq 0 (
-        echo [INFO] Reinstalling better-sqlite3...
-        cd /d "%~dp0server"
-        call npm install better-sqlite3
-    )
+if %errorlevel% equ 0 goto sqlite_ok
+
+echo ========================================================
+echo  [!] SQLite driver version mismatch detected.
+echo  [!] Automatically configuring database binary for this Node...
+echo ========================================================
+echo.
+
+if exist "%~dp0server\node_modules\better-sqlite3" (
+    cd /d "%~dp0server\node_modules\better-sqlite3"
+    call npx prebuild-install --force
+    cd /d "%~dp0server"
 )
+
+node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
+if %errorlevel% equ 0 goto sqlite_ok
+
+echo [INFO] Rebuilding better-sqlite3 driver...
+call npm rebuild better-sqlite3
+
+node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
+if %errorlevel% equ 0 goto sqlite_ok
+
+echo [INFO] Reinstalling better-sqlite3 package...
+call npm install --force better-sqlite3
+
+:sqlite_ok
+echo.
 
 :: Ensure client build exists
 if not exist "%~dp0client\dist" (
@@ -143,4 +153,10 @@ echo  Press Ctrl+C to stop the server.
 echo ========================================================
 echo.
 node src/index.js
+if %errorlevel% neq 0 (
+    echo.
+    echo ========================================================
+    echo  Server stopped with an error code %errorlevel%.
+    echo ========================================================
+)
 pause
