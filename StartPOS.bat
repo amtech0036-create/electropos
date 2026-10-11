@@ -97,11 +97,31 @@ if not exist "%~dp0server\node_modules" (
     call npm install --silent
 )
 
-:: Verify SQLite driver compatibility
-node -e "require('better-sqlite3')" >nul 2>nul
-if %errorlevel% neq 0 (
-    echo [INFO] Rebuilding database drivers for this Node runtime...
-    call npm rebuild better-sqlite3 >nul 2>nul
+:: Verify SQLite driver compatibility by instantiating an in-memory database
+node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
+if !errorlevel! neq 0 (
+    echo ========================================================
+    echo  [!] SQLite driver mismatch (compiled for different Node).
+    echo  [!] Automatically configuring database binary for this Node...
+    echo ========================================================
+    echo.
+    if exist "%~dp0server\node_modules\better-sqlite3" (
+        cd /d "%~dp0server\node_modules\better-sqlite3"
+        call npx --yes prebuild-install --force >nul 2>nul
+        cd /d "%~dp0server"
+    )
+    node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
+    if !errorlevel! neq 0 (
+        echo [INFO] Running npm rebuild better-sqlite3...
+        cd /d "%~dp0server"
+        call npm rebuild better-sqlite3
+    )
+    node -e "const DB = require('better-sqlite3'); new DB(':memory:');" >nul 2>nul
+    if !errorlevel! neq 0 (
+        echo [INFO] Reinstalling better-sqlite3...
+        cd /d "%~dp0server"
+        call npm install better-sqlite3
+    )
 )
 
 :: Ensure client build exists
