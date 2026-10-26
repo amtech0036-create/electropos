@@ -1112,10 +1112,121 @@ tr.cancelled td {
 .th-line { margin: 3px 0; }
 .th-total { font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; }
 
+/* Toggle Switch */
+.switch-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch-toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+.switch-toggle.active {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4);
+}
+.switch-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.switch-toggle.active::after {
+  transform: translateX(20px);
+}
+
+/* Money Receipt / Payment Voucher */
+.money-receipt-card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 24px 28px;
+  max-width: 620px;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+  font-family: var(--font-sans);
+}
+.money-receipt-header {
+  text-align: center;
+  border-bottom: 2px dashed #94a3b8;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+.money-receipt-title {
+  display: inline-block;
+  padding: 4px 14px;
+  border: 2px solid #0f172a;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-top: 8px;
+}
+.money-receipt-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 0.88rem;
+  margin-bottom: 14px;
+}
+.money-receipt-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 14px 0;
+}
+.money-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 0.9rem;
+}
+.money-receipt-row.highlight {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #15803d;
+  border-top: 1px solid #cbd5e1;
+  border-bottom: 1px solid #cbd5e1;
+  padding: 8px 0;
+  margin: 6px 0;
+}
+.money-receipt-signatures {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 36px;
+  padding-top: 10px;
+}
+.money-receipt-sign-line {
+  border-top: 1px dashed #64748b;
+  width: 150px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #64748b;
+  padding-top: 4px;
+}
+
 @media print {
   body * { visibility: hidden; }
-  .invoice-a4, .invoice-thermal, .invoice-a4 *, .invoice-thermal * { visibility: visible; }
-  .invoice-a4, .invoice-thermal { position: absolute; left: 0; top: 0; width: 100%; border: none; }
+  .invoice-a4, .invoice-thermal, .invoice-a4 *, .invoice-thermal *,
+  .money-receipt-card, .money-receipt-card * { visibility: visible; }
+  .invoice-a4, .invoice-thermal, .money-receipt-card { position: absolute; left: 0; top: 0; width: 100%; border: none; box-shadow: none; }
   .invoice-thermal { width: 76mm; font-size: 12px; }
   .invoice-a4 { padding: 0; }
   .no-print { display: none !important; }

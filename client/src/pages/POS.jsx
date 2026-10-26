@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, fmtMoney } from '../api.js';
+import { api, fmtMoney, fmtOrdinalDate } from '../api.js';
 import CustomerLedgerModal from '../components/CustomerLedgerModal.jsx';
+
 
 export default function POS() {
   const nav = useNavigate();
@@ -498,89 +499,157 @@ export default function POS() {
         {/* Installment Plan configuration when due > 0 and registered customer selected */}
         {due > 0 && customerId !== 1 && (
           <div className="installment-card">
-            <div className="installment-title">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, cursor: 'pointer', userSelect: 'none' }}>
-                <input
-                  type="checkbox"
-                  checked={isInstallment}
-                  onChange={e => setIsInstallment(e.target.checked)}
-                  style={{ width: 'auto', margin: 0 }}
-                />
-                <span>📅 Pay Remaining Due in Installments</span>
-              </label>
+            {/* Interactive Toggle Switch Button */}
+            <div
+              className="switch-container"
+              onClick={() => setIsInstallment(!isInstallment)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.9)',
+                padding: '10px 14px',
+                borderRadius: '12px',
+                border: '1px solid #c7d2fe',
+                marginBottom: isInstallment ? '12px' : '0'
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, color: '#312e81', fontSize: '0.92rem' }}>
+                  📅 Pay with Installment Plan
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                  {isInstallment ? 'Installment plan is ON — choose schedule below' : 'Click to enable weekly, monthly, or quarterly installments'}
+                </div>
+              </div>
+              <div className={`switch-toggle ${isInstallment ? 'active' : ''}`} />
             </div>
 
             {isInstallment && (
               <div style={{ marginTop: '8px' }}>
+                {/* Total Due Amount Placeholder & Display */}
+                <label style={{ margin: '6px 0 10px' }}>
+                  Total Due Amount (Split in Installments)
+                  <input
+                    readOnly
+                    value={fmtMoney(due)}
+                    placeholder="Total Due Amount"
+                    style={{
+                      fontWeight: 800,
+                      background: '#ffffff',
+                      color: '#dc2626',
+                      fontSize: '1.05rem',
+                      fontFamily: 'var(--font-mono)',
+                      border: '1px solid #fca5a5'
+                    }}
+                  />
+                </label>
+
+                {/* Installment Time / Frequency (Week / Month / Quarter) */}
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
-                  Number of Installments:
+                  Installment Time / Frequency:
+                </div>
+                <div className="pill-group" style={{ marginBottom: '10px' }}>
+                  <button
+                    type="button"
+                    className={`pill-btn ${installmentFreq === 'weekly' ? 'active' : ''}`}
+                    onClick={() => {
+                      setInstallmentFreq('weekly');
+                      const d = new Date(); d.setDate(d.getDate() + 7);
+                      setNextDueDate(d.toISOString().slice(0, 10));
+                    }}
+                  >
+                    🗓️ Weekly (Weeks)
+                  </button>
+                  <button
+                    type="button"
+                    className={`pill-btn ${installmentFreq === 'monthly' ? 'active' : ''}`}
+                    onClick={() => {
+                      setInstallmentFreq('monthly');
+                      const d = new Date(); d.setMonth(d.getMonth() + 1);
+                      setNextDueDate(d.toISOString().slice(0, 10));
+                    }}
+                  >
+                    📅 Monthly (Months)
+                  </button>
+                  <button
+                    type="button"
+                    className={`pill-btn ${installmentFreq === 'quarterly' ? 'active' : ''}`}
+                    onClick={() => {
+                      setInstallmentFreq('quarterly');
+                      const d = new Date(); d.setMonth(d.getMonth() + 3);
+                      setNextDueDate(d.toISOString().slice(0, 10));
+                    }}
+                  >
+                    📊 Quarterly (3 Months)
+                  </button>
+                </div>
+
+                {/* Installment Duration Count */}
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
+                  Number of {installmentFreq === 'weekly' ? 'Weeks' : installmentFreq === 'quarterly' ? 'Quarters' : 'Months'}:
                 </div>
                 <div className="pill-group">
-                  {[2, 3, 4, 6, 12].map(n => (
+                  {(installmentFreq === 'weekly'
+                    ? [2, 4, 8, 12]
+                    : installmentFreq === 'quarterly'
+                    ? [2, 3, 4]
+                    : [2, 3, 4, 6, 12]
+                  ).map(n => (
                     <button
                       key={n}
                       type="button"
                       className={`pill-btn ${installmentCount === n ? 'active' : ''}`}
                       onClick={() => setInstallmentCount(n)}
                     >
-                      {n}x
+                      {n} {installmentFreq === 'weekly' ? 'Weeks' : installmentFreq === 'quarterly' ? 'Quarters' : 'Months'}
                     </button>
                   ))}
                   <input
                     type="number"
                     min="2"
                     max="60"
+                    placeholder="Custom count"
                     value={installmentCount}
                     onChange={e => setInstallmentCount(Math.max(2, parseInt(e.target.value, 10) || 2))}
-                    style={{ width: '60px', padding: '3px 6px', fontSize: '0.82rem', margin: 0 }}
+                    style={{ width: '70px', padding: '3px 6px', fontSize: '0.82rem', margin: 0 }}
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
+                {/* Due Date Picker */}
+                <div style={{ marginTop: '8px' }}>
                   <label style={{ margin: 0 }}>
-                    Frequency
-                    <select
-                      value={installmentFreq}
-                      onChange={e => setInstallmentFreq(e.target.value)}
-                      style={{ margin: 0 }}
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="biweekly">Bi-weekly</option>
-                    </select>
-                  </label>
-
-                  <label style={{ margin: 0 }}>
-                    First Due Date
+                    First Installment Due Date
                     <input
                       type="date"
                       value={nextDueDate}
                       onChange={e => setNextDueDate(e.target.value)}
-                      style={{ margin: 0 }}
-                    >
-                    </input>
+                      style={{ margin: '4px 0 0' }}
+                    />
                   </label>
                 </div>
 
-                <div className="installment-preview">
-                  <div>Remaining Due: <strong>{fmtMoney(due)}</strong></div>
-                  <div>
-                    Schedule: <span className="installment-preview-amt">{installmentCount}x {fmtMoney(Math.round(due / installmentCount))}</span> / {installmentFreq}
+                {/* Calculation Breakdown Preview */}
+                <div className="installment-preview" style={{ marginTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Remaining Due:</span>
+                    <strong style={{ color: '#dc2626' }}>{fmtMoney(due)}</strong>
                   </div>
-                  {nextDueDate && (
-                    <div className="muted" style={{ fontSize: '0.78rem' }}>
-                      First payment expected: {nextDueDate}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span>Installment Amount:</span>
+                    <span className="installment-preview-amt">
+                      {installmentCount}x {fmtMoney(Math.round(due / installmentCount))}
+                    </span>
+                  </div>
+                  <div className="muted" style={{ fontSize: '0.78rem', marginTop: '4px' }}>
+                    Frequency: <strong>{installmentFreq.toUpperCase()}</strong> · Next due date: <strong>{fmtOrdinalDate(nextDueDate)}</strong>
+                  </div>
                 </div>
 
-                <label style={{ marginTop: '8px', marginBottom: 0 }}>
-                  Installment Notes / Agreement
+                <label style={{ marginTop: '10px', marginBottom: 0 }}>
+                  Installment Agreement / Notes (Optional)
                   <input
-                    placeholder="e.g. Guarantee check #, monthly schedule"
+                    placeholder="e.g. Guarantee check #, NID copy, monthly payment date"
                     value={installmentNotes}
                     onChange={e => setInstallmentNotes(e.target.value)}
-                    style={{ margin: 0 }}
+                    style={{ margin: '4px 0 0' }}
                   />
                 </label>
               </div>

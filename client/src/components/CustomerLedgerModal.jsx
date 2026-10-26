@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { api, fmtMoney, fmtDate } from '../api.js';
+import { api, fmtMoney, fmtDate, fmtOrdinalDate } from '../api.js';
+import MoneyReceiptModal from './MoneyReceiptModal.jsx';
 
 export default function CustomerLedgerModal({ customerId, onClose, onPaymentCollected }) {
   const [data, setData] = useState(null);
@@ -14,6 +15,7 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [activeTab, setActiveTab] = useState('ledger'); // 'ledger' | 'invoices'
+  const [lastReceipt, setLastReceipt] = useState(null);
 
   async function loadCustomer() {
     if (!customerId) return;
@@ -52,15 +54,18 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
     setError('');
     setSuccessMsg('');
     try {
-      await api.post(`/api/customers/${customerId}/collections`, {
+      const res = await api.post(`/api/customers/${customerId}/collections`, {
         amount: numAmt,
         method,
         sale_id: saleId ? parseInt(saleId, 10) : null,
         notes: notes.trim()
       });
-      setSuccessMsg(`✓ Successfully collected ${fmtMoney(numAmt)} via ${method.toUpperCase()}`);
+      setSuccessMsg(res.message || `✓ Successfully collected ${fmtMoney(numAmt)} via ${method.toUpperCase()}`);
       setAmount('');
       setNotes('');
+      if (res.receipt) {
+        setLastReceipt(res.receipt);
+      }
       await loadCustomer();
       if (onPaymentCollected) onPaymentCollected();
     } catch (err) {
@@ -71,6 +76,7 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
   }
 
   if (!customerId) return null;
+
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -266,7 +272,40 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
                               <span className="ledger-badge-credit">{row.type === 'collection' ? 'Collection' : 'Payment'}</span>
                             )}
                           </td>
-                          <td><strong>{row.reference}</strong></td>
+                          <td>
+                            <strong>{row.reference}</strong>
+                            {row.receipt_no && (
+                              <button
+                                type="button"
+                                className="btn btn-link"
+                                style={{ padding: '0 4px', fontSize: '0.75rem', marginLeft: '6px', color: '#4f46e5' }}
+                                onClick={() => {
+                                  const linkedSale = (data.sales || []).find(s => s.due > 0 && s.installment_amount);
+                                  setLastReceipt({
+                                    receipt_no: row.receipt_no,
+                                    created_at: row.date,
+                                    customer_name: data.name,
+                                    customer_phone: data.phone,
+                                    customer_address: data.address,
+                                    cashier_name: 'Cashier',
+                                    method: row.method || 'cash',
+                                    amount_paid: row.credit,
+                                    previous_due: row.balance + row.credit,
+                                    new_due: row.balance,
+                                    notes: row.notes,
+                                    next_installment: row.balance > 0 && linkedSale ? {
+                                      date: linkedSale.next_due_date,
+                                      amount: linkedSale.installment_amount,
+                                      frequency: linkedSale.frequency
+                                    } : null,
+                                    settings: data.settings || {}
+                                  });
+                                }}
+                              >
+                                🧾 Receipt
+                              </button>
+                            )}
+                          </td>
                           <td style={{ fontSize: '0.84rem' }}>{row.notes || '—'}</td>
                           <td className="num" style={{ color: row.debit > 0 ? '#b91c1c' : undefined, fontWeight: row.debit > 0 ? 600 : 400 }}>
                             {row.debit > 0 ? fmtMoney(row.debit) : '—'}
@@ -311,7 +350,7 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
                           <td className="num">{fmtMoney(s.total)}</td>
                           <td className="num">{fmtMoney(s.paid)}</td>
                           <td className="num">
-                            {s.due > 0 ? <strong className="warn">{fmtMoney(s.due)}</strong> : <span style={{ color: '#16a34a' }}>Paid</span>}
+                            {s.due > 0 ? <strong className="warn">{fmtMoney(s.due)}</strong> : <span style={{ color: '#16a34a' }}>✓ Settled</span>}
                           </td>
                           <td>
                             {s.total_installments > 1 ? (
@@ -352,6 +391,13 @@ export default function CustomerLedgerModal({ customerId, onClose, onPaymentColl
           </div>
         )}
       </div>
+
+      {lastReceipt && (
+        <MoneyReceiptModal
+          receipt={lastReceipt}
+          onClose={() => setLastReceipt(null)}
+        />
+      )}
     </div>
   );
 }

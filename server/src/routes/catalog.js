@@ -231,12 +231,48 @@ r.get('/customers', (req, res) => {
   const params = [];
   if (q) { sql += ' AND (cu.name LIKE ? OR cu.phone LIKE ?)'; params.push(`%${q}%`, `%${q}%`); }
   sql += ' ORDER BY cu.is_walkin DESC, cu.name LIMIT 100';
-  const rows = db.prepare(sql).all(...params).map(c => ({
-    ...c, total_purchases: fromMinor(c.total_purchases), total_payments: fromMinor(c.total_payments),
-    outstanding_due: fromMinor(c.total_purchases - c.total_payments)
-  }));
+
+  const getActiveInst = db.prepare(`
+    SELECT si.*, s.invoice_no FROM sale_installments si
+    JOIN sales s ON s.id = si.sale_id
+    WHERE si.customer_id = ? AND si.status = 'active' AND s.due > 0
+    ORDER BY si.next_due_date ASC LIMIT 1
+  `);
+
+  const rows = db.prepare(sql).all(...params).map(c => {
+    const tp = fromMinor(c.total_purchases);
+    const tpay = fromMinor(c.total_payments);
+    const due = fromMinor(Math.max(0, c.total_purchases - c.total_payments));
+
+    let activeInst = null;
+    if (due > 0) {
+      const inst = getActiveInst.get(c.id);
+      if (inst) {
+        activeInst = {
+          id: inst.id,
+          sale_id: inst.sale_id,
+          invoice_no: inst.invoice_no,
+          installment_amount: fromMinor(inst.installment_amount),
+          frequency: inst.frequency,
+          next_due_date: inst.next_due_date,
+          total_installments: inst.total_installments,
+          paid_installments: inst.paid_installments || 0,
+          status: inst.status
+        };
+      }
+    }
+
+    return {
+      ...c,
+      total_purchases: tp,
+      total_payments: tpay,
+      outstanding_due: due,
+      active_installment: activeInst
+    };
+  });
   res.json(rows);
 });
+
 
 r.post('/customers', (req, res) => {
   let { name = '', phone = '', address = '' } = req.body || {};
@@ -300,11 +336,13 @@ r.get('/customers/:id', (req, res) => {
     events.push({
       date: p.created_at,
       type: p.kind === 'collection' ? 'collection' : 'payment',
-      reference: p.invoice_no ? `${p.invoice_no} (${p.method})` : `Due Collection (${p.method})`,
+      reference: p.receipt_no ? `${p.receipt_no} (${p.method})` : (p.invoice_no ? `${p.invoice_no} (${p.method})` : `Due Collection (${p.method})`),
       notes: p.notes || '',
       debit: 0,
       credit: fromMinor(p.amount), // Payment decreases customer debt
-      payment_id: p.id
+      payment_id: p.id,
+      receipt_no: p.receipt_no || null,
+      method: p.method
     });
   }
 
@@ -344,21 +382,136 @@ r.post('/customers/:id/collections', requirePermission('payment.collect'), (req,
   const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Customer not found' });
 
-  db.transaction(() => {
-    db.prepare(`INSERT INTO payments (sale_id, customer_id, method, amount, kind, user_id, notes)
-      VALUES (?, ?, ?, ?, 'collection', ?, ?)`).run(sale_id || null, c.id, method, minor, req.user.id, notes || '');
+  let receiptNo = '';
+  let previousDue = 0;
+  let newDue = 0;
 
-    // If linked to an invoice, reduce its due balance
+  db.transaction(() => {
+    // 1. Calculate previous due balance
+    const totals = db.prepare(`SELECT
+      COALESCE((SELECT SUM(total) FROM sales WHERE customer_id = ? AND status='completed'), 0) AS tp,
+      COALESCE((SELECT SUM(amount) FROM payments WHERE customer_id = ?), 0) AS tpay`).get(c.id, c.id);
+    previousDue = Math.max(0, totals.tp - totals.tpay);
+
+    // 2. Generate unique Receipt / Voucher Number
+    const year = new Date().getFullYear();
+    db.prepare(`INSERT INTO receipt_counters (year, seq) VALUES (?, 1)
+                ON CONFLICT(year) DO UPDATE SET seq = seq + 1`).run(year);
+    const seq = db.prepare('SELECT seq FROM receipt_counters WHERE year = ?').get(year).seq;
+    receiptNo = `REC-${year}-${String(seq).padStart(5, '0')}`;
+
+    // 3. Record payment with receipt_no
+    db.prepare(`INSERT INTO payments (sale_id, customer_id, method, amount, kind, user_id, notes, receipt_no)
+      VALUES (?, ?, ?, ?, 'collection', ?, ?, ?)`).run(sale_id || null, c.id, method, minor, req.user.id, notes || '', receiptNo);
+
+    // 4. Reduce due on linked sale or auto-allocate across unpaid sales
+    let remainingToApply = minor;
     if (sale_id) {
       const s = db.prepare('SELECT id, paid, due FROM sales WHERE id = ? AND customer_id = ?').get(sale_id, c.id);
-      if (s) {
-        const applyAmt = Math.min(minor, s.due);
+      if (s && s.due > 0) {
+        const applyAmt = Math.min(remainingToApply, s.due);
         db.prepare('UPDATE sales SET paid = paid + ?, due = due - ? WHERE id = ?').run(applyAmt, applyAmt, s.id);
+        remainingToApply -= applyAmt;
+      }
+    }
+    if (remainingToApply > 0) {
+      const unpaidSales = db.prepare("SELECT id, paid, due FROM sales WHERE customer_id = ? AND status = 'completed' AND due > 0 ORDER BY id ASC").all(c.id);
+      for (const s of unpaidSales) {
+        if (remainingToApply <= 0) break;
+        const applyAmt = Math.min(remainingToApply, s.due);
+        db.prepare('UPDATE sales SET paid = paid + ?, due = due - ? WHERE id = ?').run(applyAmt, applyAmt, s.id);
+        remainingToApply -= applyAmt;
+      }
+    }
+
+    // 5. Calculate new due balance
+    newDue = Math.max(0, previousDue - minor);
+
+    // 6. Handle installment advancement or auto-settlement
+    if (newDue <= 0) {
+      // Customer paid full balance -> ALL active installments are auto-settled!
+      db.prepare(`UPDATE sale_installments SET status = 'completed' WHERE customer_id = ? AND status = 'active'`).run(c.id);
+    } else {
+      // Advance next installment date based on installment frequency (weekly, monthly, quarterly)
+      const targetInst = sale_id
+        ? db.prepare(`SELECT * FROM sale_installments WHERE sale_id = ? AND status = 'active'`).get(sale_id)
+        : db.prepare(`SELECT * FROM sale_installments WHERE customer_id = ? AND status = 'active' ORDER BY next_due_date ASC LIMIT 1`).get(c.id);
+
+      if (targetInst) {
+        const linkedSale = db.prepare('SELECT due FROM sales WHERE id = ?').get(targetInst.sale_id);
+        if (linkedSale && linkedSale.due <= 0) {
+          db.prepare(`UPDATE sale_installments SET status = 'completed' WHERE id = ?`).run(targetInst.id);
+        } else {
+          // Advance next_due_date
+          let nextDt = targetInst.next_due_date ? new Date(targetInst.next_due_date) : new Date();
+          if (isNaN(nextDt.getTime())) nextDt = new Date();
+
+          if (targetInst.frequency === 'weekly') {
+            nextDt.setDate(nextDt.getDate() + 7);
+          } else if (targetInst.frequency === 'quarterly') {
+            nextDt.setMonth(nextDt.getMonth() + 3);
+          } else { // monthly
+            nextDt.setMonth(nextDt.getMonth() + 1);
+          }
+          const nextDueDateStr = nextDt.toISOString().slice(0, 10);
+          db.prepare(`UPDATE sale_installments SET paid_installments = paid_installments + 1, next_due_date = ? WHERE id = ?`)
+            .run(nextDueDateStr, targetInst.id);
+        }
       }
     }
   })();
 
-  res.json({ ok: true, message: 'Due payment successfully collected.' });
+  // 7. Query updated next installment date for receipt
+  let nextInstallmentInfo = null;
+  if (newDue <= 0) {
+    nextInstallmentInfo = {
+      status: 'completed',
+      date: null,
+      text: 'Fully Settled (৳0.00 Due)'
+    };
+  } else {
+    const nextInst = db.prepare(`
+      SELECT si.*, s.invoice_no FROM sale_installments si
+      JOIN sales s ON s.id = si.sale_id
+      WHERE si.customer_id = ? AND si.status = 'active' AND s.due > 0
+      ORDER BY si.next_due_date ASC LIMIT 1
+    `).get(c.id);
+
+    if (nextInst) {
+      nextInstallmentInfo = {
+        status: 'active',
+        date: nextInst.next_due_date,
+        amount: fromMinor(nextInst.installment_amount),
+        frequency: nextInst.frequency,
+        invoice_no: nextInst.invoice_no
+      };
+    }
+  }
+
+  const cashier = db.prepare('SELECT username FROM users WHERE id = ?').get(req.user.id);
+  const settings = {};
+  for (const row of db.prepare('SELECT key, value FROM settings').all()) settings[row.key] = row.value;
+
+  res.json({
+    ok: true,
+    message: newDue <= 0 ? 'Full balance cleared! Installment plan auto-settled.' : 'Due payment successfully collected.',
+    receipt: {
+      receipt_no: receiptNo,
+      created_at: new Date().toISOString(),
+      customer_id: c.id,
+      customer_name: c.name,
+      customer_phone: c.phone || '',
+      customer_address: c.address || '',
+      cashier_name: cashier?.username || 'Cashier',
+      method,
+      amount_paid: fromMinor(minor),
+      previous_due: fromMinor(previousDue),
+      new_due: fromMinor(newDue),
+      notes: notes || '',
+      next_installment: nextInstallmentInfo,
+      settings
+    }
+  });
 });
 
 export { r as apiRouter };

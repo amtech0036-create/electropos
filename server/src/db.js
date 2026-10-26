@@ -294,12 +294,32 @@ CREATE TABLE IF NOT EXISTS sale_installments (
 `);
 
 try {
+  db.exec("ALTER TABLE sale_installments ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE sale_installments ADD COLUMN paid_installments INTEGER NOT NULL DEFAULT 0");
+} catch (e) {}
+
+try {
   db.exec("ALTER TABLE payments ADD COLUMN notes TEXT DEFAULT ''");
 } catch (e) {}
 
 try {
   db.exec("ALTER TABLE payments ADD COLUMN transaction_ref TEXT DEFAULT ''");
 } catch (e) {}
+
+try {
+  db.exec("ALTER TABLE payments ADD COLUMN receipt_no TEXT DEFAULT ''");
+} catch (e) {}
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS receipt_counters (
+  year INTEGER PRIMARY KEY,
+  seq INTEGER NOT NULL DEFAULT 0
+);
+`);
+
 
 const seedCategories = db.prepare(`INSERT OR IGNORE INTO categories (name) VALUES (?)`);
 const defaults = [

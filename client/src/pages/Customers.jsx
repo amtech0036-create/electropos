@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, fmtMoney } from '../api.js';
+import { api, fmtMoney, fmtOrdinalDate } from '../api.js';
 import { useAuth } from '../App.jsx';
 import CustomerLedgerModal from '../components/CustomerLedgerModal.jsx';
 
@@ -74,12 +74,13 @@ export default function Customers() {
                 <th className="num">Purchases</th>
                 <th className="num">Paid</th>
                 <th className="num">Balance Due</th>
+                <th>Next Installment</th>
                 <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {customers.length === 0 ? (
-                <tr><td colSpan="7" className="muted" style={{ textAlign: 'center', padding: '24px' }}>No customers found.</td></tr>
+                <tr><td colSpan="8" className="muted" style={{ textAlign: 'center', padding: '24px' }}>No customers found.</td></tr>
               ) : (
                 customers.map(c => (
                   <tr key={c.id}>
@@ -96,6 +97,22 @@ export default function Customers() {
                         <span className="warn" style={{ fontWeight: 700 }}>{fmtMoney(c.outstanding_due)}</span>
                       ) : (
                         <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td>
+                      {c.active_installment && c.outstanding_due > 0 ? (
+                        <div>
+                          <span className="badge badge-draft" style={{ background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', fontSize: '0.8rem' }}>
+                            📅 {fmtOrdinalDate(c.active_installment.next_due_date)}
+                          </span>
+                          <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '2px' }}>
+                            {fmtMoney(c.active_installment.installment_amount)} ({c.active_installment.frequency})
+                          </div>
+                        </div>
+                      ) : c.outstanding_due > 0 ? (
+                        <span className="muted" style={{ fontSize: '0.82rem' }}>Due on invoice</span>
+                      ) : (
+                        <span style={{ color: '#16a34a', fontSize: '0.82rem', fontWeight: 600 }}>✓ Settled</span>
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>

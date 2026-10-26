@@ -28,3 +28,27 @@ export function fmtDate(s) {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 }
+
+export function fmtOrdinalDate(s) {
+  if (!s) return '—';
+  // Check if string is simple YYYY-MM-DD
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  let d;
+  if (m) {
+    d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  } else {
+    d = new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z');
+  }
+  if (isNaN(d.getTime())) return s;
+
+  const day = d.getDate();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const month = months[d.getMonth()];
+  const year = d.getFullYear();
+  let suffix = 'th';
+  if (day % 10 === 1 && day !== 11) suffix = 'st';
+  else if (day % 10 === 2 && day !== 12) suffix = 'nd';
+  else if (day % 10 === 3 && day !== 13) suffix = 'rd';
+  return `${day}${suffix} ${month}, ${year}`;
+}
+
