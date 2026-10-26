@@ -15,6 +15,13 @@ export default function Settings() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [userForm, setUserForm] = useState({ username: '', password: '', full_name: '', role: 'cashier' });
 
+  // Backup & Restore
+  const [backupInfo, setBackupInfo] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [restoreConfirmed, setRestoreConfirmed] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreStatus, setRestoreStatus] = useState('');
+
   const isAdmin = user.role === 'admin';
 
   function loadSettings() {
@@ -25,10 +32,77 @@ export default function Settings() {
     api.get('/api/users').then(setUsers).catch(e => setError(e.message));
   }
 
+  function loadBackupInfo() {
+    api.get('/api/backup/info').then(setBackupInfo).catch(() => {});
+  }
+
   useEffect(() => {
     loadSettings();
-    if (isAdmin) loadUsers();
+    if (isAdmin) {
+      loadUsers();
+      loadBackupInfo();
+    }
   }, []);
+
+  async function handleRestoreSubmit(e) {
+    e.preventDefault();
+    if (!selectedFile) {
+      setError('Please select a .db or .json backup file.');
+      return;
+    }
+    if (!restoreConfirmed) {
+      setError('Please check the confirmation box to proceed with restore.');
+      return;
+    }
+
+    if (!confirm(`Are you absolutely sure you want to restore "${selectedFile.name}"? All current records will be replaced by the backup contents.`)) {
+      return;
+    }
+
+    setRestoring(true);
+    setError('');
+    setSuccess('');
+    setRestoreStatus('Uploading and verifying backup file...');
+
+    try {
+      const isJson = selectedFile.name.toLowerCase().endsWith('.json');
+      let res;
+      if (isJson) {
+        setRestoreStatus('Parsing and importing JSON database records...');
+        const text = await selectedFile.text();
+        const json = JSON.parse(text);
+        res = await fetch('/api/backup/restore-json', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(json),
+          credentials: 'same-origin'
+        });
+      } else {
+        setRestoreStatus('Restoring full SQLite database snapshot...');
+        res = await fetch('/api/backup/restore-db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: selectedFile,
+          credentials: 'same-origin'
+        });
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Restore failed');
+
+      setSuccess('✓ Database successfully restored! Please refresh the page to reload all records.');
+      setSelectedFile(null);
+      setRestoreConfirmed(false);
+      loadBackupInfo();
+      loadSettings();
+      loadUsers();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRestoring(false);
+      setRestoreStatus('');
+    }
+  }
 
   async function handleSaveSettings(e) {
     e.preventDefault();
@@ -117,6 +191,7 @@ export default function Settings() {
           <button className={tab === 'shop' ? 'active' : ''} onClick={() => setTab('shop')}>Shop Profile</button>
           <button className={tab === 'invoice' ? 'active' : ''} onClick={() => setTab('invoice')}>Invoice & Tax</button>
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users & Roles</button>
+          <button className={tab === 'backup' ? 'active' : ''} onClick={() => { setTab('backup'); loadBackupInfo(); }}>Backup & Restore</button>
         </div>
       </div>
 
@@ -294,6 +369,131 @@ export default function Settings() {
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* BACKUP & RESTORE */}
+      {tab === 'backup' && (
+        <div className="backup-section">
+          {/* Status summary card */}
+          <div className="card">
+            <h3>Database Overview</h3>
+            <div className="cards" style={{ marginTop: '12px', marginBottom: 0 }}>
+              <div className="card" style={{ marginBottom: 0 }}>
+                <div className="stat-label">Database File Size</div>
+                <div className="stat-value">
+                  {backupInfo?.size_bytes ? `${(backupInfo.size_bytes / 1024).toFixed(1)} KB` : 'Ready'}
+                </div>
+              </div>
+              <div className="card" style={{ marginBottom: 0 }}>
+                <div className="stat-label">Total Products</div>
+                <div className="stat-value">{backupInfo?.counts?.products ?? '—'}</div>
+              </div>
+              <div className="card" style={{ marginBottom: 0 }}>
+                <div className="stat-label">Completed Sales</div>
+                <div className="stat-value">{backupInfo?.counts?.sales ?? '—'}</div>
+              </div>
+              <div className="card" style={{ marginBottom: 0 }}>
+                <div className="stat-label">Customers</div>
+                <div className="stat-value">{backupInfo?.counts?.customers ?? '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="two-col" style={{ gap: '20px' }}>
+            {/* Download Backup Card */}
+            <div className="card">
+              <h3>📥 Download Backup</h3>
+              <p className="muted" style={{ lineHeight: '1.5', margin: '8px 0 16px' }}>
+                Create a point-in-time copy of your entire Prime POS database. Keep regular backups safely on an external USB drive or cloud folder.
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '10px', background: '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.98rem' }}>Full Database (.db) — Recommended</h4>
+                  <p className="muted" style={{ fontSize: '0.84rem', margin: '0 0 14px', lineHeight: '1.4' }}>
+                    Complete byte-for-byte snapshot of all products, stock history, IMEI serials, customers, invoices, transactions, and settings.
+                  </p>
+                  <a href="/api/backup/download-db" download className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Download Database Backup (.db)
+                  </a>
+                </div>
+
+                <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '10px', background: '#f8fafc' }}>
+                  <h4 style={{ margin: '0 0 6px', fontSize: '0.98rem' }}>Export Data as JSON (.json)</h4>
+                  <p className="muted" style={{ fontSize: '0.84rem', margin: '0 0 14px', lineHeight: '1.4' }}>
+                    Human-readable JSON export of all shop records, ideal for spreadsheets, audits, and custom reporting.
+                  </p>
+                  <a href="/api/backup/export-json" download className="btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Export JSON Data (.json)
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Restore Backup Card */}
+            <div className="card">
+              <h3>📤 Upload & Restore Backup</h3>
+              <p className="muted" style={{ lineHeight: '1.5', margin: '8px 0 16px' }}>
+                Restore your Prime POS database from a previously downloaded <strong>.db</strong> or <strong>.json</strong> backup file.
+              </p>
+
+              <form onSubmit={handleRestoreSubmit}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ fontWeight: '600', marginBottom: '6px', color: 'var(--text)' }}>
+                    Select Backup File (.db or .json)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".db,.sqlite,.json"
+                    onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                    disabled={restoring}
+                    style={{ padding: '10px', background: '#f8fafc', cursor: 'pointer' }}
+                  />
+                  {selectedFile && (
+                    <div style={{ marginTop: '6px', fontSize: '0.82rem', color: '#2563eb' }}>
+                      Selected: <strong>{selectedFile.name}</strong> ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', marginBottom: '16px' }}>
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#92400e', lineHeight: '1.4' }}>
+                    ⚠️ <strong>Warning:</strong> Restoring will overwrite all current sales, products, and customer records with the records from the uploaded backup file.
+                  </p>
+                </div>
+
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer', marginBottom: '16px', fontSize: '0.85rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={restoreConfirmed}
+                    onChange={e => setRestoreConfirmed(e.target.checked)}
+                    style={{ width: 'auto', marginTop: '2px' }}
+                    disabled={restoring}
+                  />
+                  <span>I understand that this will replace my current database records with the backup file.</span>
+                </label>
+
+                {restoreStatus && (
+                  <div style={{ padding: '8px 12px', background: '#eff6ff', color: '#1d4ed8', borderRadius: '6px', fontSize: '0.85rem', marginBottom: '12px' }}>
+                    ⏳ {restoreStatus}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={!selectedFile || !restoreConfirmed || restoring}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#dc2626', borderColor: '#dc2626' }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  {restoring ? 'Restoring Database...' : 'Restore Database Now'}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

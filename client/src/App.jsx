@@ -60,7 +60,7 @@ export default function App() {
     <AuthCtx.Provider value={user}>
       <div className="app">
         <aside className="sidebar">
-          <div className="brand">Electro<span>POS</span></div>
+          <div className="brand">Prime<span>POS</span></div>
           <nav>
             <NavLink to="/">Dashboard</NavLink>
             <NavLink to="/pos" className="new-sale">＋ New Sale</NavLink>

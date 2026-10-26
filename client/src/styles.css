@@ -68,12 +68,161 @@ input, select { padding: 8px 10px; border: 1px solid var(--border); border-radiu
 label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 10px; }
 .page-head input { width: auto; margin: 0; }
 
-/* Login */
-.login-wrap { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-.login-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 32px; width: 340px; }
-.login-card h1 { text-align: center; }
-.login-card h1 span { color: var(--primary); }
-.login-card .btn { width: 100%; padding: 10px; margin-top: 8px; }
+/* Login Glassmorphism & Animations */
+.login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: 
+    radial-gradient(circle at 18% 22%, rgba(37, 99, 235, 0.14), transparent 42%),
+    radial-gradient(circle at 82% 78%, rgba(124, 58, 237, 0.13), transparent 42%),
+    radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08), transparent 50%),
+    #f8fafc;
+}
+
+.login-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 18px;
+  padding: 34px 30px 24px;
+  width: 370px;
+  max-width: 92vw;
+  box-shadow: 
+    0 20px 45px -12px rgba(15, 23, 42, 0.12),
+    0 0 0 1px rgba(226, 232, 240, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: cardFadeIn 0.45s ease-out;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-card h1 {
+  text-align: center;
+  font-size: 1.6rem;
+  letter-spacing: -0.02em;
+}
+.login-card h1 span {
+  color: var(--primary);
+  font-weight: 800;
+}
+.login-card .muted {
+  text-align: center;
+  margin-top: 4px;
+  margin-bottom: 18px;
+}
+.login-card .btn {
+  width: 100%;
+  padding: 11px;
+  margin-top: 10px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(29, 78, 216, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.login-card .btn:hover:not(:disabled) {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px rgba(29, 78, 216, 0.35);
+}
+
+/* Glassmorphic Footer */
+.login-footer {
+  margin-top: 22px;
+  padding: 14px 12px;
+  background: rgba(241, 245, 249, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 14px;
+  box-shadow: 
+    0 4px 15px -3px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  text-align: center;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.login-footer:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  box-shadow: 0 8px 24px -4px rgba(37, 99, 235, 0.12);
+}
+
+.dev-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #475569;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.dev-tag strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+.dev-pulse {
+  width: 7px;
+  height: 7px;
+  background: #10b981;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseGlow 2s infinite;
+}
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.dev-icon {
+  color: var(--primary);
+}
+
+.dev-links {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.dev-link-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  color: #2563eb;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+.dev-link-pill svg {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.dev-link-pill:hover {
+  background: #ffffff;
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+.dev-link-pill:hover svg {
+  transform: scale(1.15);
+}
 
 /* POS */
 .pos { display: grid; grid-template-columns: 1fr 340px; gap: 16px; align-items: start; }
