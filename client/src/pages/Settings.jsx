@@ -228,6 +228,14 @@ export default function Settings() {
               />
             </label>
             <label>
+              Shop Website
+              <input
+                value={settings.shop_website || ''}
+                onChange={e => setSettings({ ...settings, shop_website: e.target.value })}
+                placeholder="e.g. https://amtechsolutionsbd.com"
+              />
+            </label>
+            <label>
               Currency Code
               <input
                 value={settings.currency || 'BDT'}

@@ -334,6 +334,7 @@ const upsertSetting = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?
 upsertSetting.run('shop_name', 'ElectroPOS Shop');
 upsertSetting.run('shop_address', '');
 upsertSetting.run('shop_phone', '');
+upsertSetting.run('shop_website', '');
 upsertSetting.run('currency', 'BDT');
 upsertSetting.run('tax_rate_percent', '0');
 upsertSetting.run('invoice_prefix', 'INV-');

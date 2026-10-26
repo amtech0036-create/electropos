@@ -69,7 +69,7 @@ r.get('/settings', (req, res) => {
 });
 
 r.put('/settings', requireAuth, requirePermission('settings.manage'), (req, res) => {
-  const allowed = ['shop_name', 'shop_address', 'shop_phone', 'currency', 'tax_rate_percent',
+  const allowed = ['shop_name', 'shop_address', 'shop_phone', 'shop_website', 'website', 'currency', 'tax_rate_percent',
     'invoice_prefix', 'purchase_prefix', 'show_serial_on_invoice', 'warranty_terms', 'date_format'];
   const up = db.prepare(`INSERT INTO settings (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`);

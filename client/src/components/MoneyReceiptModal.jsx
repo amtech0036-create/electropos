@@ -27,7 +27,7 @@ export default function MoneyReceiptModal({ receipt, onClose }) {
               {s.shop_name || 'Prime POS'}
             </h2>
             <div style={{ fontSize: '0.85rem', color: '#475569' }}>
-              {s.shop_address}{s.shop_phone ? ` · Tel: ${s.shop_phone}` : ''}
+              {s.shop_address}{s.shop_phone ? ` · Tel: ${s.shop_phone}` : ''}{s.shop_website ? ` · ${s.shop_website}` : ''}
             </div>
             <div className="money-receipt-title">Money Receipt</div>
           </div>

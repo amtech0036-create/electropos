@@ -38,7 +38,9 @@ export default function Invoice() {
           <div className="inv-head">
             <div>
               <h2>{s.shop_name}</h2>
-              <div className="muted">{s.shop_address}{s.shop_phone ? ` · ${s.shop_phone}` : ''}</div>
+              <div className="muted">
+                {s.shop_address}{s.shop_phone ? ` · Tel: ${s.shop_phone}` : ''}{s.shop_website ? ` · ${s.shop_website}` : ''}
+              </div>
             </div>
             <div className="inv-meta">
               <div><strong>{sale.invoice_no}</strong></div>
@@ -121,6 +123,7 @@ export default function Invoice() {
             <h3>{s.shop_name}</h3>
             <div>{s.shop_address}</div>
             <div>{s.shop_phone}</div>
+            {s.shop_website && <div>{s.shop_website}</div>}
           </div>
           <div className="th-sep">--------------------------------</div>
           <div>Invoice: {sale.invoice_no}</div>
