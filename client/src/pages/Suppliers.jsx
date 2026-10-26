@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api, fmtMoney, fmtDate } from '../api.js';
 import { useAuth } from '../App.jsx';
 
@@ -13,6 +13,7 @@ const EMPTY_SUPPLIER = {
 
 export default function Suppliers() {
   const user = useAuth();
+  const ledgerRef = useRef(null);
   const [suppliers, setSuppliers] = useState([]);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
@@ -36,9 +37,16 @@ export default function Suppliers() {
   useEffect(() => { load(); }, []);
 
   async function openSupplierLedger(s) {
+    if (selectedSupplier?.id === s.id) {
+      setSelectedSupplier(null);
+      return;
+    }
     try {
       const full = await api.get(`/api/suppliers/${s.id}`);
       setSelectedSupplier(full);
+      setTimeout(() => {
+        ledgerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 60);
     } catch (e) {
       setError(e.message);
     }
@@ -118,7 +126,7 @@ export default function Suppliers() {
 
       {error && <div className="error">{error}</div>}
 
-      <div className="cards" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <div className="cards">
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="stat-label">Total Suppliers</div>
           <div className="stat-value">{suppliers.length}</div>
@@ -129,171 +137,199 @@ export default function Suppliers() {
         </div>
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="stat-label">Total Paid</div>
-          <div className="stat-value" style={{ color: '#16a34a' }}>{fmtMoney(totalPaymentsVal)}</div>
+          <div className="stat-value" style={{ color: '#10b981' }}>{fmtMoney(totalPaymentsVal)}</div>
         </div>
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="stat-label">Total Payable Due</div>
-          <div className="stat-value" style={{ color: totalOutstanding > 0 ? '#dc2626' : 'inherit' }}>
+          <div className="stat-value" style={{ color: totalOutstanding > 0 ? '#ef4444' : 'inherit' }}>
             {fmtMoney(totalOutstanding)}
           </div>
         </div>
       </div>
 
-      <div className="two-col" style={{ marginTop: '16px' }}>
-        {/* Suppliers List */}
-        <div className="card">
+      {/* Full-width Suppliers Table */}
+      <div className="card" style={{ marginTop: '20px', padding: 0 }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0 }}>Supplier Directory</h3>
+          <span className="muted" style={{ fontSize: '0.82rem' }}>{suppliers.length} suppliers registered</span>
+        </div>
+        <div className="table-responsive">
           <table>
             <thead>
               <tr>
-                <th>Supplier / Company</th>
+                <th style={{ paddingLeft: '20px' }}>Supplier / Company</th>
                 <th>Phone</th>
                 <th className="num">Purchases</th>
                 <th className="num">Paid</th>
                 <th className="num">Balance Due</th>
-                <th></th>
+                <th style={{ textAlign: 'center', paddingRight: '20px' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {suppliers.map(s => (
-                <tr key={s.id} style={{ background: selectedSupplier?.id === s.id ? '#f1f5f9' : 'inherit' }}>
-                  <td>
-                    <strong>{s.name}</strong>
-                    {s.company_name && <div className="muted"><small>{s.company_name}</small></div>}
-                  </td>
-                  <td>{s.phone || '—'}</td>
-                  <td className="num">{fmtMoney(s.total_purchases)}</td>
-                  <td className="num">{fmtMoney(s.total_payments)}</td>
-                  <td className="num">
-                    {s.outstanding_balance > 0 ? (
-                      <span className="warn font-bold">{fmtMoney(s.outstanding_balance)}</span>
-                    ) : s.outstanding_balance < 0 ? (
-                      <span style={{ color: '#16a34a' }}>Advance ({fmtMoney(Math.abs(s.outstanding_balance))})</span>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>
-                    <button className="btn btn-link" onClick={() => openSupplierLedger(s)}>Ledger</button>
-                    {canManage && (
-                      <button
-                        className="btn btn-link"
-                        style={{ color: '#16a34a' }}
-                        onClick={() => { setShowPayModal(s); setPayAmount(s.outstanding_balance > 0 ? s.outstanding_balance : ''); }}
-                      >
-                        Pay
+              {suppliers.map(s => {
+                const isSelected = selectedSupplier?.id === s.id;
+                return (
+                  <tr key={s.id} style={{ background: isSelected ? 'rgba(99, 102, 241, 0.08)' : 'inherit' }}>
+                    <td style={{ paddingLeft: '20px' }}>
+                      <strong style={{ display: 'block', color: 'var(--text)' }}>{s.name}</strong>
+                      {s.company_name && <div className="muted"><small>{s.company_name}</small></div>}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{s.phone || '—'}</td>
+                    <td className="num">{fmtMoney(s.total_purchases)}</td>
+                    <td className="num">{fmtMoney(s.total_payments)}</td>
+                    <td className="num">
+                      {s.outstanding_balance > 0 ? (
+                        <span className="warn font-bold">{fmtMoney(s.outstanding_balance)}</span>
+                      ) : s.outstanding_balance < 0 ? (
+                        <span style={{ color: '#10b981', fontWeight: 600 }}>Advance ({fmtMoney(Math.abs(s.outstanding_balance))})</span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center', paddingRight: '20px', whiteSpace: 'nowrap' }}>
+                      <button className="btn btn-link" onClick={() => openSupplierLedger(s)}>
+                        {isSelected ? '✕ Hide Ledger' : 'Ledger'}
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {canManage && (
+                        <button
+                          className="btn btn-link"
+                          style={{ color: '#10b981', fontWeight: 600 }}
+                          onClick={() => { setShowPayModal(s); setPayAmount(s.outstanding_balance > 0 ? s.outstanding_balance : ''); }}
+                        >
+                          Pay
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {suppliers.length === 0 && (
-                <tr><td colSpan="6" className="muted" style={{ textAlign: 'center', padding: '24px' }}>No suppliers found.</td></tr>
+                <tr><td colSpan="6" className="muted" style={{ textAlign: 'center', padding: '32px' }}>No suppliers found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Selected Supplier Detailed Ledger */}
-        <div>
-          {selectedSupplier ? (
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
-                <div>
-                  <h2 style={{ marginBottom: '4px' }}>{selectedSupplier.name}</h2>
-                  <div className="muted">
-                    {selectedSupplier.company_name && <span>{selectedSupplier.company_name} · </span>}
-                    {selectedSupplier.phone && <span>📞 {selectedSupplier.phone} · </span>}
-                    {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
-                  </div>
-                </div>
-                {canManage && (
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => { setShowPayModal(selectedSupplier); setPayAmount(selectedSupplier.outstanding_balance > 0 ? selectedSupplier.outstanding_balance : ''); }}
-                  >
-                    Pay Supplier
-                  </button>
-                )}
+      {/* Selected Supplier Detailed Ledger */}
+      {selectedSupplier && (
+        <div ref={ledgerRef} className="card" style={{ marginTop: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ margin: 0 }}>{selectedSupplier.name}</h2>
+                <span className="badge badge-finalized">Active Supplier</span>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', margin: '14px 0', padding: '10px', background: '#f8fafc', borderRadius: '8px' }}>
-                <div>
-                  <div className="stat-label">Total Purchases</div>
-                  <strong>{fmtMoney(selectedSupplier.total_purchases)}</strong>
-                </div>
-                <div>
-                  <div className="stat-label">Total Paid</div>
-                  <strong style={{ color: '#16a34a' }}>{fmtMoney(selectedSupplier.total_payments)}</strong>
-                </div>
-                <div>
-                  <div className="stat-label">Outstanding Payable</div>
-                  <strong className={selectedSupplier.outstanding_balance > 0 ? 'warn' : ''}>
-                    {fmtMoney(selectedSupplier.outstanding_balance)}
-                  </strong>
-                </div>
+              <div className="muted" style={{ marginTop: '4px' }}>
+                {selectedSupplier.company_name && <span>{selectedSupplier.company_name} · </span>}
+                {selectedSupplier.phone && <span>📞 {selectedSupplier.phone} · </span>}
+                {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
               </div>
+            </div>
+            <div className="btn-row">
+              {canManage && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => { setShowPayModal(selectedSupplier); setPayAmount(selectedSupplier.outstanding_balance > 0 ? selectedSupplier.outstanding_balance : ''); }}
+                >
+                  Pay Supplier
+                </button>
+              )}
+              <button className="btn" onClick={() => setSelectedSupplier(null)}>
+                ✕ Close Ledger
+              </button>
+            </div>
+          </div>
 
-              <h3>Statement Ledger</h3>
-              <div style={{ maxHeight: '350px', overflowY: 'auto', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Reference / Transaction</th>
-                      <th className="num">Debit (Paid)</th>
-                      <th className="num">Credit (Bill)</th>
-                      <th className="num">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedSupplier.ledger.map((entry, idx) => (
-                      <tr key={idx}>
-                        <td className="muted"><small>{fmtDate(entry.date)}</small></td>
-                        <td>
-                          <span>{entry.reference}</span>
-                          {entry.notes && <div className="muted"><small>{entry.notes}</small></div>}
-                        </td>
-                        <td className="num" style={{ color: entry.debit > 0 ? '#16a34a' : 'inherit' }}>
-                          {entry.debit > 0 ? fmtMoney(entry.debit) : '—'}
-                        </td>
-                        <td className="num" style={{ color: entry.credit > 0 ? '#dc2626' : 'inherit' }}>
-                          {entry.credit > 0 ? fmtMoney(entry.credit) : '—'}
-                        </td>
-                        <td className="num font-bold">
-                          {fmtMoney(entry.balance)}
-                        </td>
-                      </tr>
-                    ))}
-                    {selectedSupplier.ledger.length === 0 && (
-                      <tr><td colSpan="5" className="muted" style={{ textAlign: 'center', padding: '16px' }}>No ledger entries.</td></tr>
-                    )}
-                  </tbody>
-                </table>
+          <div className="cards" style={{ margin: '18px 0' }}>
+            <div className="card" style={{ marginBottom: 0, padding: '16px' }}>
+              <div className="stat-label">Total Purchases</div>
+              <div className="stat-value" style={{ fontSize: '1.3rem' }}>{fmtMoney(selectedSupplier.total_purchases)}</div>
+            </div>
+            <div className="card" style={{ marginBottom: 0, padding: '16px' }}>
+              <div className="stat-label">Total Paid</div>
+              <div className="stat-value" style={{ color: '#10b981', fontSize: '1.3rem' }}>{fmtMoney(selectedSupplier.total_payments)}</div>
+            </div>
+            <div className="card" style={{ marginBottom: 0, padding: '16px' }}>
+              <div className="stat-label">Outstanding Payable</div>
+              <div className="stat-value" style={{ color: selectedSupplier.outstanding_balance > 0 ? '#ef4444' : 'inherit', fontSize: '1.3rem' }}>
+                {fmtMoney(selectedSupplier.outstanding_balance)}
               </div>
+            </div>
+          </div>
 
-              <h4 style={{ marginTop: '16px' }}>Recent Invoices</h4>
+          <h3>Statement Ledger</h3>
+          <div style={{ border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden', marginBottom: '20px' }}>
+            <div className="table-responsive" style={{ maxHeight: '380px', overflowY: 'auto' }}>
               <table>
-                <thead><tr><th>Purchase No</th><th>Date</th><th className="num">Total</th><th className="num">Due</th><th>Status</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Reference / Transaction</th>
+                    <th className="num">Debit (Paid)</th>
+                    <th className="num">Credit (Bill)</th>
+                    <th className="num">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSupplier.ledger.map((entry, idx) => (
+                    <tr key={idx}>
+                      <td className="muted" style={{ whiteSpace: 'nowrap' }}><small>{fmtDate(entry.date)}</small></td>
+                      <td>
+                        <strong>{entry.reference}</strong>
+                        {entry.notes && <div className="muted"><small>{entry.notes}</small></div>}
+                      </td>
+                      <td className="num" style={{ color: entry.debit > 0 ? '#10b981' : 'inherit' }}>
+                        {entry.debit > 0 ? fmtMoney(entry.debit) : '—'}
+                      </td>
+                      <td className="num" style={{ color: entry.credit > 0 ? '#ef4444' : 'inherit' }}>
+                        {entry.credit > 0 ? fmtMoney(entry.credit) : '—'}
+                      </td>
+                      <td className="num font-bold">
+                        {fmtMoney(entry.balance)}
+                      </td>
+                    </tr>
+                  ))}
+                  {selectedSupplier.ledger.length === 0 && (
+                    <tr><td colSpan="5" className="muted" style={{ textAlign: 'center', padding: '20px' }}>No ledger entries.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <h3>Recent Purchase Invoices</h3>
+          <div style={{ border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+            <div className="table-responsive">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Purchase No</th>
+                    <th>Date</th>
+                    <th className="num">Total</th>
+                    <th className="num">Due</th>
+                    <th style={{ textAlign: 'center' }}>Status</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {selectedSupplier.purchases.slice(0, 5).map(p => (
                     <tr key={p.id}>
                       <td><strong>{p.purchase_no}</strong></td>
-                      <td className="muted">{p.purchase_date}</td>
+                      <td className="muted" style={{ whiteSpace: 'nowrap' }}>{p.purchase_date}</td>
                       <td className="num">{fmtMoney(p.total)}</td>
                       <td className="num">{p.due > 0 ? fmtMoney(p.due) : '—'}</td>
-                      <td><span className={`badge badge-${p.status}`}>{p.status}</span></td>
+                      <td style={{ textAlign: 'center' }}><span className={`badge badge-${p.status}`}>{p.status}</span></td>
                     </tr>
                   ))}
+                  {selectedSupplier.purchases.length === 0 && (
+                    <tr><td colSpan="5" className="muted" style={{ textAlign: 'center', padding: '16px' }}>No purchase invoices.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
-              👈 Select a supplier to inspect their ledger statement and payment history.
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ADD SUPPLIER MODAL */}
       {showAddModal && (

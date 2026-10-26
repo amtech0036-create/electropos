@@ -572,6 +572,12 @@ label {
 /* ============================================================
    Tables
    ============================================================ */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -580,7 +586,7 @@ table {
 
 th, td {
   text-align: left;
-  padding: 11px 14px;
+  padding: 12px 14px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.7);
 }
 
@@ -590,7 +596,8 @@ th {
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: rgba(248, 250, 252, 0.6);
+  background: rgba(248, 250, 252, 0.7);
+  white-space: nowrap;
 }
 
 tr:hover td {
@@ -600,6 +607,7 @@ tr:hover td {
 td.num, th.num {
   text-align: right;
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 tr.cancelled td {
