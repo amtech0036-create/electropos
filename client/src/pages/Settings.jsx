@@ -22,6 +22,11 @@ export default function Settings() {
   const [restoring, setRestoring] = useState(false);
   const [restoreStatus, setRestoreStatus] = useState('');
 
+  // License & Subscription
+  const [licenseInfo, setLicenseInfo] = useState(null);
+  const [activationKeyInput, setActivationKeyInput] = useState('');
+  const [activating, setActivating] = useState(false);
+
   const isAdmin = user.role === 'admin';
 
   function loadSettings() {
@@ -36,8 +41,33 @@ export default function Settings() {
     api.get('/api/backup/info').then(setBackupInfo).catch(() => {});
   }
 
+  function loadLicenseInfo() {
+    api.get('/api/license/status').then(setLicenseInfo).catch(() => {});
+  }
+
+  async function handleActivateLicense(e) {
+    e.preventDefault();
+    if (!activationKeyInput.trim()) return;
+    setActivating(true);
+    setError(''); setSuccess('');
+    try {
+      await api.post('/api/license/activate', {
+        license_key: activationKeyInput.trim(),
+        device_label: 'Main Terminal POS'
+      });
+      setSuccess('✓ Prime POS License activated successfully on this terminal!');
+      setActivationKeyInput('');
+      loadLicenseInfo();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setActivating(false);
+    }
+  }
+
   useEffect(() => {
     loadSettings();
+    loadLicenseInfo();
     if (isAdmin) {
       loadUsers();
       loadBackupInfo();
@@ -192,6 +222,7 @@ export default function Settings() {
           <button className={tab === 'invoice' ? 'active' : ''} onClick={() => setTab('invoice')}>Invoice & Tax</button>
           <button className={tab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users & Roles</button>
           <button className={tab === 'backup' ? 'active' : ''} onClick={() => { setTab('backup'); loadBackupInfo(); }}>Backup & Restore</button>
+          <button className={tab === 'license' ? 'active' : ''} onClick={() => { setTab('license'); loadLicenseInfo(); }}>License & Subscription</button>
         </div>
       </div>
 
@@ -501,6 +532,149 @@ export default function Settings() {
                   {restoring ? 'Restoring Database...' : 'Restore Database Now'}
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LICENSE & SUBSCRIPTION SETTINGS */}
+      {tab === 'license' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Machine Identity & Status Card */}
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>Terminal License & Machine Identity</h3>
+              <button className="btn" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={loadLicenseInfo}>
+                🔄 Refresh Status
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.5)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Hardware Machine Fingerprint (ID)
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                  <code style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary)', fontFamily: 'monospace' }}>
+                    {licenseInfo?.machine_id || 'Detecting...'}
+                  </code>
+                  <button
+                    className="btn"
+                    style={{ padding: '2px 8px', fontSize: '0.75rem' }}
+                    onClick={() => {
+                      if (licenseInfo?.machine_id) {
+                        navigator.clipboard.writeText(licenseInfo.machine_id);
+                        alert('Machine ID copied to clipboard!');
+                      }
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Tied to this POS station's motherboard and CPU
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.5)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Current License Status
+                </span>
+                <div style={{ marginTop: '6px' }}>
+                  <span className={`badge ${licenseInfo?.status === 'active' ? 'badge-emerald' : licenseInfo?.status === 'grace_period' ? 'badge-amber' : 'badge-rose'}`} style={{ fontSize: '0.9rem', padding: '4px 12px' }}>
+                    {licenseInfo?.status ? licenseInfo.status.toUpperCase() : 'UNLICENSED'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                  {licenseInfo?.status === 'grace_period'
+                    ? `⚠️ Grace period active: ${licenseInfo.graceRemainingDays} day(s) left!`
+                    : licenseInfo?.expires_at
+                    ? `Valid until ${new Date(licenseInfo.expires_at).toLocaleDateString('en-GB')}`
+                    : 'No active commercial license activated'}
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.5)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>
+                  Active Edition & Plan
+                </span>
+                <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '6px', color: 'var(--text)' }}>
+                  {licenseInfo?.plan_name ? `${licenseInfo.plan_name} (${licenseInfo.edition || 'Standard'})` : 'Free Evaluation'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  {licenseInfo?.remainingDays !== undefined ? `${licenseInfo.remainingDays} day(s) remaining in term` : 'Local Terminal'}
+                </div>
+              </div>
+            </div>
+
+            {/* License details when active */}
+            {licenseInfo?.license_key_masked && (
+              <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '6px', border: '1px solid var(--border)', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600 }}>Active License Key:</span>
+                  <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#4f46e5', fontSize: '1rem', marginTop: '2px' }}>
+                    {licenseInfo.license_key_masked}
+                  </div>
+                </div>
+                <div>
+                  <span className="badge" style={{ background: '#e0e7ff', color: '#4338ca' }}>
+                    Registered To: {licenseInfo.business_name}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Feature Entitlements */}
+            {licenseInfo?.features && (
+              <div style={{ marginBottom: '16px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  Enabled Feature Modules
+                </span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                  {licenseInfo.features.map(f => (
+                    <span key={f} className="badge badge-emerald" style={{ fontSize: '0.75rem' }}>
+                      ✓ {f.replace('_', ' ')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Activate / Replace Key Card */}
+          <div className="card">
+            <h3>Activate / Update License Key</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', margin: '4px 0 16px 0' }}>
+              Purchased a new license, plan upgrade, or renewal from A&M Tech Solutions BD? Enter your 20-character license key below.
+            </p>
+
+            <form onSubmit={handleActivateLicense} style={{ display: 'flex', gap: '10px', maxWidth: '640px' }}>
+              <input
+                type="text"
+                placeholder="PRIME-XXXX-XXXX-XXXX-XXXX"
+                value={activationKeyInput}
+                onChange={e => setActivationKeyInput(e.target.value.toUpperCase())}
+                style={{ flex: 1, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '0.08em', padding: '10px 14px' }}
+                required
+              />
+              <button type="submit" className="btn btn-primary" disabled={activating} style={{ whiteSpace: 'nowrap' }}>
+                {activating ? 'Activating...' : 'Activate Terminal'}
+              </button>
+            </form>
+          </div>
+
+          {/* Support & Billing Contact Card */}
+          <div className="card" style={{ background: 'linear-gradient(135deg, rgba(79,70,229,0.04) 0%, rgba(6,182,212,0.04) 100%)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: 'var(--primary)' }}>
+              Need to Renew or Upgrade your License?
+            </h4>
+            <div style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+              Contact our official licensing department directly:
+              <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '16px', fontWeight: 600 }}>
+                <span>📞 Hotline: <strong>+8801736002401</strong></span>
+                <span>🌐 Website: <strong>amtechsolutionsbd.com</strong></span>
+                <span>✉️ Email: <strong>licensing@amtechsolutionsbd.com</strong></span>
+              </div>
             </div>
           </div>
         </div>

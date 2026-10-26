@@ -15,6 +15,7 @@ import Stock from './pages/Stock.jsx';
 import Settings from './pages/Settings.jsx';
 import CashRegister from './pages/CashRegister.jsx';
 import WarrantyLookup from './pages/WarrantyLookup.jsx';
+import LicensingHub from './pages/Licensing/LicensingHub.jsx';
 
 const AuthCtx = createContext(null);
 export const useAuth = () => useContext(AuthCtx);
@@ -22,11 +23,16 @@ export const useAuth = () => useContext(AuthCtx);
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [licenseStatus, setLicenseStatus] = useState(null);
 
   useEffect(() => {
     api.get('/api/auth/me')
-      .then(setUser)
-      .catch(() => setUser(null))
+      .then(u => {
+        setUser(u);
+        return api.get('/api/license/status');
+      })
+      .then(setLicenseStatus)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -55,6 +61,7 @@ export default function App() {
 
   const canPurchases = user.role === 'admin' || user.role === 'stock_manager';
   const isAdmin = user.role === 'admin';
+  const isSuperAdmin = user.is_super_admin === 1 || user.role === 'admin';
 
   return (
     <AuthCtx.Provider value={user}>
@@ -129,6 +136,12 @@ export default function App() {
                 <span>Settings</span>
               </NavLink>
             )}
+            {isSuperAdmin && (
+              <NavLink to="/licensing">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                <span>Licensing & Plans</span>
+              </NavLink>
+            )}
           </nav>
           <div className="sidebar-footer">
             <div className="user-card">
@@ -145,6 +158,37 @@ export default function App() {
           </div>
         </aside>
         <main className="content">
+          {/* Global License Expiry / Grace Period Warning Banner */}
+          {licenseStatus && (licenseStatus.status === 'grace_period' || licenseStatus.status === 'expired' || (licenseStatus.status === 'active' && licenseStatus.remainingDays <= 7)) && (
+            <div style={{
+              background: licenseStatus.status === 'expired' ? '#fee2e2' : licenseStatus.status === 'grace_period' ? '#fef3c7' : '#e0e7ff',
+              color: licenseStatus.status === 'expired' ? '#991b1b' : licenseStatus.status === 'grace_period' ? '#92400e' : '#3730a3',
+              border: `1px solid ${licenseStatus.status === 'expired' ? '#fca5a5' : licenseStatus.status === 'grace_period' ? '#fcd34d' : '#c7d2fe'}`,
+              padding: '10px 18px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontWeight: 600,
+              fontSize: '0.88rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>{licenseStatus.status === 'expired' ? '⛔' : '⚠️'}</span>
+                <span>
+                  {licenseStatus.status === 'expired'
+                    ? 'Your Prime POS commercial license has expired. Cash register checkout is restricted to read-only. Please renew with A&M Tech Solutions BD.'
+                    : licenseStatus.status === 'grace_period'
+                    ? `Subscription Term Expired — Grace period active (${licenseStatus.graceRemainingDays} day(s) remaining). Renew soon to avoid checkout interruption.`
+                    : `Subscription Notice: License term expires in ${licenseStatus.remainingDays} day(s) on ${new Date(licenseStatus.expires_at).toLocaleDateString()}.`}
+                </span>
+              </div>
+              <NavLink to="/settings" style={{ background: 'currentColor', color: '#ffffff', padding: '4px 10px', borderRadius: '4px', textDecoration: 'none', fontSize: '0.78rem' }}>
+                <span style={{ color: licenseStatus.status === 'expired' ? '#991b1b' : licenseStatus.status === 'grace_period' ? '#92400e' : '#3730a3', filter: 'invert(1)' }}>Renew License</span>
+              </NavLink>
+            </div>
+          )}
+
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/pos" element={<POS />} />
@@ -164,6 +208,7 @@ export default function App() {
               </>
             )}
             {isAdmin && <Route path="/settings" element={<Settings />} />}
+            {isSuperAdmin && <Route path="/licensing/*" element={<LicensingHub />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

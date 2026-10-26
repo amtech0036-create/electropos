@@ -385,3 +385,12 @@ export function toMinor(value) {
 export function fromMinor(minor) {
   return (minor ?? 0) / 100;
 }
+
+// Run subscription & licensing migrations safely
+import { runSubscriptionMigrations } from './db/migrations.js';
+try {
+  runSubscriptionMigrations();
+} catch (e) {
+  console.error('[Migration Error] Subscription system initialization failed:', e);
+}
+

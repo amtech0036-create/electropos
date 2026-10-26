@@ -13,9 +13,14 @@ import { registerRouter } from './routes/register.js';
 import { returnsRouter } from './routes/returns.js';
 import { serialsRouter } from './routes/serials.js';
 import { backupRouter } from './routes/backup.js';
+import { licensingRouter } from './routes/licensing.js';
+import { licenseGuard, startExpiryScheduler } from './middleware/licenseGuard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+// Start background expiry checker
+startExpiryScheduler();
 
 app.use('/api/backup/restore-json', express.json({ limit: '50mb' }));
 app.use(express.json({ limit: '1mb' }));
@@ -24,7 +29,15 @@ app.use(loadUser);
 // Health check must come before routers (router-level auth middleware would 401 it)
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Auth and Licensing routes (always accessible)
 app.use('/api', authRouter);
+app.use('/api/licensing', licensingRouter);
+app.use('/api/license', licensingRouter);
+app.use('/api/backup', backupRouter);
+
+// Enforce license restrictions on mutating POS operations
+app.use(licenseGuard);
+
 app.use('/api', apiRouter);
 app.use('/api', salesRouter);
 app.use('/api', purchasesRouter);
@@ -33,7 +46,6 @@ app.use('/api', registerRouter);
 app.use('/api', returnsRouter);
 app.use('/api', serialsRouter);
 app.use('/api', reportsRouter);
-app.use('/api/backup', backupRouter);
 
 // Serve built client if present (production single-server deploy)
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');

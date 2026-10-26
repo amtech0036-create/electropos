@@ -277,6 +277,62 @@ Access the application directly at **`http://localhost:3001`**. The server autom
 | `/api/backup/restore-db` | `POST` | `admin` | Restores database from uploaded `.db` file |
 | `/api/backup/restore-json` | `POST` | `admin` | Restores database from uploaded `.json` backup |
 | `/api/settings` | `GET/PUT` | `admin` | Shop profile (name, address, phone, website), tax rates, prefixes, & warranty terms |
+| `/api/license/status` | `GET` | Public / Local | Current terminal license status, machine fingerprint, plan, and days remaining |
+| `/api/license/activate` | `POST` | Public / Local | Activates terminal using 20-character license key (`PRIME-XXXX-XXXX-XXXX-XXXX`) |
+| `/api/licensing/dashboard` | `GET` | Super Admin | Overview metrics: active licenses, revenue, expiring in 7 days, audit logs |
+| `/api/licensing/plans` | `GET/POST/PUT` | Super Admin | Manage subscription tiers (Starter, Growth, Enterprise, Lifetime) and features |
+| `/api/licensing/businesses` | `GET/POST/PUT` | Super Admin | Register and manage client store business accounts |
+| `/api/licensing/licenses` | `GET` | Super Admin | List all issued licenses with active device counts |
+| `/api/licensing/licenses/issue` | `POST` | Super Admin | Cryptographically generates random key and issues license |
+| `/api/licensing/licenses/:id/renew` | `POST` | Super Admin | Extends license validity by additional days |
+| `/api/licensing/licenses/:id/suspend` | `POST` | Super Admin | Suspends license with audit reason |
+| `/api/licensing/licenses/:id/reactivate` | `POST` | Super Admin | Reactivates suspended license |
+| `/api/licensing/licenses/:id/revoke` | `POST` | Super Admin | Permanently revokes license |
+| `/api/licensing/invoices` | `GET/POST` | Super Admin | Manage subscription billing invoices |
+| `/api/licensing/invoices/:id` | `GET` | Super Admin | View single invoice with payment records for printing |
+| `/api/licensing/payments` | `GET/POST` | Super Admin | Record manual cash, bank transfer, bKash, and Nagad payments |
+| `/api/licensing/payments/:id/verify` | `POST` | Super Admin | Verifies payment, updates invoice balance, and activates licenses |
+| `/api/licensing/devices` | `GET` | Super Admin | View all registered hardware terminals by machine ID |
+| `/api/licensing/devices/:id/deactivate` | `POST` | Super Admin | Deactivates terminal, freeing station slot |
+| `/api/licensing/devices/:id/approve-replacement` | `POST` | Super Admin | Approves hardware replacement terminal |
+| `/api/licensing/notifications` | `GET` | Super Admin | View log of 7-day, 3-day, and on-expiry alerts |
+| `/api/licensing/notifications/run-check` | `POST` | Super Admin | Triggers automated expiry notification scan |
+| `/api/licensing/audit` | `GET` | Super Admin | Immutable administrative audit log |
+
+---
+
+## 🔐 Subscription & Licensing Architecture (Hybrid Model)
+
+Prime POS includes an enterprise-grade **Hybrid Cryptographic Licensing Engine** developed by A&M Tech Solutions BD:
+
+1. **Local Machine Fingerprint (Hardware Binding):**
+   - Stations generate an immutable Hardware Fingerprint (e.g., `AM-POS-D98D-5879`) using system architecture, platform, and network interface MAC addresses.
+   - Prevents unauthorized cloning of application directories or databases across unlicensed counter PCs.
+2. **Cryptographic Key Storage:**
+   - Raw activation keys (`PRIME-XXXX-XXXX-XXXX-XXXX`) are generated using cryptographically secure random bytes.
+   - Only the **SHA-256 hash** of the license key is persisted in the database; raw keys are displayed once upon issuance and cannot be extracted from database dumps.
+   - UI displays safe masked identifiers (`PRIME-••••-••••-••••-89NX`).
+3. **Grace Period & Non-Interrupting Policy:**
+   - Default 7-day grace period upon expiry.
+   - Checkout is **never unexpectedly interrupted** in the middle of a business day; during the grace period, an `X-License-Warning` header and top banner are displayed.
+   - Read-only operations (sales history, customer ledgers, warranty lookup), database backups, and settings are **always accessible**, even after expiration.
+4. **Payment Verification Segregation:**
+   - Subscription payments (cash, bank, bKash, Nagad) are segregated from retail sales revenue.
+   - Unverified payments remain in `pending` status and **never prematurely extend** or activate a license until explicitly verified by an authorized Super Admin.
+5. **Super Admin Management Section:**
+   - Accessible via the **Licensing & Plans** link in the authenticated navigation for administrators.
+   - Includes real-time dashboards, printable subscription invoices, and official payment receipts.
+
+---
+
+## 🧪 Automated Licensing Test Suite
+
+Run the full end-to-end licensing test suite:
+```bash
+cd server
+node test-licensing-suite.js
+```
+The suite verifies database migration idempotency, key generation, SHA-256 hashing, terminal hardware binding, device limit enforcement, administrative suspension/reactivation, invoice payments and verification, renewal calculations, and middleware protection.
 
 ---
 

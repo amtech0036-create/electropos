@@ -37,7 +37,7 @@ export function loadUser(req, res, next) {
   const token = getTokenFromRequest(req);
   if (token) {
     const row = db.prepare(
-      `SELECT u.id, u.username, u.full_name, u.role, u.active
+      `SELECT u.id, u.username, u.full_name, u.role, u.is_super_admin, u.active
        FROM sessions s JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > datetime('now') AND u.active = 1`
     ).get(token);
@@ -51,6 +51,14 @@ export function loadUser(req, res, next) {
 
 export function requireAuth(req, res, next) {
   if (!req.user) return res.status(401).json({ error: 'Not logged in' });
+  next();
+}
+
+export function requireSuperAdmin(req, res, next) {
+  if (!req.user) return res.status(401).json({ error: 'Not logged in' });
+  if (req.user.is_super_admin !== 1 && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Super Admin privileges required' });
+  }
   next();
 }
 
