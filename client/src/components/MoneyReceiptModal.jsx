@@ -197,12 +197,27 @@ export default function MoneyReceiptModal({ receipt, onClose }) {
               </div>
 
               {/* Agency Branding Footer 1 inch above */}
-              <div className="inv-dev-footer">
+              <div
+                className="inv-dev-footer"
+                style={{
+                  marginTop: '1in',
+                  textAlign: 'center',
+                  fontSize: '0.82rem',
+                  color: '#475569',
+                  borderTop: '1px dashed #cbd5e1',
+                  paddingTop: '10px'
+                }}
+              >
                 <span>For Custom Software & Website — </span>
-                <a href="https://amtechsolutionsbd.com" target="_blank" rel="noopener noreferrer">
+                <a
+                  href="https://amtechsolutionsbd.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#4f46e5', fontWeight: 700, textDecoration: 'none' }}
+                >
                   Amtechsolutionsbd.com
                 </a>
-                <span style={{ margin: '0 6px' }}>·</span>
+                <span style={{ margin: '0 6px', color: '#94a3b8' }}>·</span>
                 <span>Phone: 01736002401</span>
               </div>
             </div>
