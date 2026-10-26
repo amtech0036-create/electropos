@@ -398,6 +398,9 @@ r.get('/customers/:id', (req, res) => {
   // Reverse to show most recent at the top
   const ledger = [...events].reverse();
 
+  const settings = db.prepare('SELECT key, value FROM settings').all()
+    .reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
+
   res.json({
     ...c,
     total_purchases: fromMinor(totals.tp),
@@ -411,7 +414,8 @@ r.get('/customers/:id', (req, res) => {
       installment_amount: s.installment_amount ? fromMinor(s.installment_amount) : undefined
     })),
     payments: payments.map(p => ({ ...p, amount: fromMinor(p.amount) })),
-    ledger
+    ledger,
+    settings
   });
 });
 

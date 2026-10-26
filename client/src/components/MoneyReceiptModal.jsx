@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { fmtMoney, fmtDate, fmtOrdinalDate } from '../api.js';
+import { api, fmtMoney, fmtDate, fmtOrdinalDate } from '../api.js';
 
 export default function MoneyReceiptModal({ receipt, onClose }) {
   const [mode, setMode] = useState('a4'); // 'a4' | 'thermal'
+  const [shopSettings, setShopSettings] = useState(receipt?.settings || {});
 
   useEffect(() => {
     document.body.classList.add('has-money-receipt-modal');
+    // Ensure fresh shop settings (Uttara Computers, address, phone, website)
+    api.get('/api/settings').then(res => {
+      if (res && typeof res === 'object' && res.shop_name) {
+        setShopSettings(res);
+      }
+    }).catch(() => {});
+
     return () => {
       document.body.classList.remove('has-money-receipt-modal');
     };
-  }, []);
+  }, [receipt]);
 
   if (!receipt) return null;
-  const s = receipt.settings || {};
+  const s = { ...(shopSettings || {}), ...(receipt?.settings || {}) };
 
   return createPortal(
     <div id="money-receipt-portal" className="money-receipt-portal">
@@ -76,12 +84,12 @@ export default function MoneyReceiptModal({ receipt, onClose }) {
             <div className="money-receipt-card">
               <div className="money-receipt-header">
                 <h2 style={{ margin: '0 0 4px', fontSize: '1.45rem', color: '#0f172a', fontWeight: 800 }}>
-                  {s.shop_name || 'Prime POS'}
+                  {s.shop_name || 'Uttara Computers'}
                 </h2>
                 <div style={{ fontSize: '0.86rem', color: '#475569', lineHeight: 1.4 }}>
-                  {s.shop_address}
-                  {s.shop_phone ? ` · Tel: ${s.shop_phone}` : ''}
-                  {s.shop_website ? ` · ${s.shop_website}` : ''}
+                  {s.shop_address || 'Shop 64, 3rd Floor BNS Center Uttara Dhaka 1230'}
+                  {(s.shop_phone || '01743383764') ? ` · Tel: ${s.shop_phone || '01743383764'}` : ''}
+                  {(s.shop_website || 'https://uttaracomputer.com') ? ` · ${s.shop_website || 'https://uttaracomputer.com'}` : ''}
                 </div>
                 <div className="money-receipt-title">
                   MONEY RECEIPT / PAYMENT VOUCHER
@@ -194,10 +202,12 @@ export default function MoneyReceiptModal({ receipt, onClose }) {
                ============================================================ */
             <div className="money-receipt-thermal">
               <div className="th-center">
-                <h3 style={{ margin: '0 0 2px', fontSize: '15px', fontWeight: 800 }}>{s.shop_name || 'Prime POS'}</h3>
-                <div>{s.shop_address}</div>
-                {s.shop_phone && <div>Tel: {s.shop_phone}</div>}
-                {s.shop_website && <div>{s.shop_website}</div>}
+                <h3 style={{ margin: '0 0 2px', fontSize: '15px', fontWeight: 800 }}>
+                  {s.shop_name || 'Uttara Computers'}
+                </h3>
+                <div>{s.shop_address || 'Shop 64, 3rd Floor BNS Center Uttara Dhaka 1230'}</div>
+                <div>Tel: {s.shop_phone || '01743383764'}</div>
+                <div>{s.shop_website || 'https://uttaracomputer.com'}</div>
               </div>
               <div className="th-sep">--------------------------------</div>
               <div className="th-center" style={{ fontWeight: 700, letterSpacing: '0.05em' }}>
