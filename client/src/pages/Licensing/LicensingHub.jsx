@@ -144,10 +144,14 @@ export default function LicensingHub() {
   async function handleRegisterBusiness(e) {
     e.preventDefault();
     try {
-      await api.post('/api/licensing/businesses', bizForm);
-      setSuccess('Business registered successfully');
+      const res = await api.post('/api/licensing/businesses', bizForm);
+      setSuccess(`Business "${bizForm.business_name}" registered successfully!`);
       setShowBusinessModal(false);
       loadBusinesses();
+      if (confirm(`Account "${bizForm.business_name}" registered! Would you like to issue a license key for this store right now?`)) {
+        setIssueForm({ business_id: res.id, plan_id: '', custom_duration_days: '', notes: 'Initial license issuance' });
+        setShowIssueModal(true);
+      }
     } catch (err) {
       setError(err.message);
     }
@@ -299,7 +303,27 @@ export default function LicensingHub() {
             A&M Tech Solutions BD Super Admin Control Panel · Local & Cloud License Lifecycle Management
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => {
+              setBizForm({ business_name: '', owner_name: '', phone: '', email: '', address: '', trade_license_no: '', notes: '' });
+              setShowBusinessModal(true);
+            }}
+            style={{ fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>+</span> Register Client Business Account
+          </button>
+          <button 
+            className="btn" 
+            onClick={() => {
+              setIssueForm({ business_id: '', plan_id: '', custom_duration_days: '', notes: '' });
+              setShowIssueModal(true);
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <span>🔑</span> Issue License
+          </button>
           <button className="btn" onClick={handleRunExpiryCheck} title="Check expiry triggers and create notifications">
             🔄 Check Expiry
           </button>
@@ -350,6 +374,39 @@ export default function LicensingHub() {
       {/* ============================================================ */}
       {activeTab === 'dashboard' && dashboardData && (
         <div>
+          {/* Quick Actions Onboarding Card */}
+          <div className="card" style={{ padding: '16px 20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%)', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>🏪</span> Register Client Business Account
+              </h3>
+              <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                Onboard new customer retail shops, configure store details, and generate commercial license keys.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => {
+                  setBizForm({ business_name: '', owner_name: '', phone: '', email: '', address: '', trade_license_no: '', notes: '' });
+                  setShowBusinessModal(true);
+                }}
+                style={{ padding: '8px 16px', fontWeight: 600 }}
+              >
+                + Register Client Business Account
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => {
+                  setIssueForm({ business_id: '', plan_id: '', custom_duration_days: '', notes: '' });
+                  setShowIssueModal(true);
+                }}
+                style={{ padding: '8px 16px' }}
+              >
+                🔑 Issue License Key
+              </button>
+            </div>
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
             <div className="card" style={{ padding: '18px' }}>
               <div style={{ color: 'var(--muted)', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 600 }}>Active Subscriptions</div>
@@ -1048,7 +1105,13 @@ export default function LicensingHub() {
       {showBusinessModal && (
         <div className="modal-backdrop" onClick={() => setShowBusinessModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '580px', width: '90%' }}>
-            <h2>Register Client Business Account</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+              <div>
+                <h2 style={{ margin: 0 }}>Register Client Business Account</h2>
+                <span style={{ fontSize: '0.84rem', color: 'var(--muted)' }}>Onboard new retail store or business customer for license issuance</span>
+              </div>
+              <button className="btn" style={{ padding: '4px 8px', fontSize: '0.8rem' }} onClick={() => setShowBusinessModal(false)}>✕</button>
+            </div>
             <form onSubmit={handleRegisterBusiness} className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '16px' }}>
               <label style={{ gridColumn: '1 / -1' }}>
                 Business / Shop Name *
@@ -1074,9 +1137,11 @@ export default function LicensingHub() {
                 Shop Physical Address
                 <input placeholder="e.g. Shop 64, 3rd Floor, BNS Center, Uttara" value={bizForm.address} onChange={e => setBizForm({ ...bizForm, address: e.target.value })} />
               </label>
-              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '12px' }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                 <button type="button" className="btn" onClick={() => setShowBusinessModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Register Account</button>
+                <button type="submit" className="btn btn-primary" style={{ fontWeight: 600 }}>
+                  Register Account (for new customers)
+                </button>
               </div>
             </form>
           </div>
