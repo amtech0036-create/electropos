@@ -1153,13 +1153,14 @@ tr.cancelled td {
 /* Money Receipt / Payment Voucher */
 .money-receipt-card {
   background: #ffffff;
-  border: 1px solid #cbd5e1;
-  border-radius: 14px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
   padding: 24px 28px;
-  max-width: 620px;
+  max-width: 640px;
   margin: 0 auto;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
   font-family: var(--font-sans);
+  color: #0f172a;
 }
 .money-receipt-header {
   text-align: center;
@@ -1172,65 +1173,258 @@ tr.cancelled td {
   padding: 4px 14px;
   border: 2px solid #0f172a;
   border-radius: 6px;
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   margin-top: 8px;
+  background: #f8fafc;
+  color: #0f172a;
 }
 .money-receipt-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  font-size: 0.88rem;
-  margin-bottom: 14px;
+  gap: 10px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
 }
 .money-receipt-box {
   background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin: 14px 0;
 }
 .money-receipt-row {
   display: flex;
   justify-content: space-between;
-  padding: 5px 0;
-  font-size: 0.9rem;
+  padding: 6px 0;
+  font-size: 0.92rem;
 }
 .money-receipt-row.highlight {
   font-size: 1.15rem;
   font-weight: 800;
   color: #15803d;
-  border-top: 1px solid #cbd5e1;
-  border-bottom: 1px solid #cbd5e1;
-  padding: 8px 0;
+  border-top: 1.5px solid #94a3b8;
+  border-bottom: 1.5px solid #94a3b8;
+  padding: 9px 0;
   margin: 6px 0;
 }
 .money-receipt-signatures {
   display: flex;
   justify-content: space-between;
-  margin-top: 36px;
+  margin-top: 40px;
   padding-top: 10px;
 }
 .money-receipt-sign-line {
-  border-top: 1px dashed #64748b;
-  width: 150px;
+  border-top: 1.5px dashed #64748b;
+  width: 170px;
   text-align: center;
-  font-size: 0.8rem;
-  color: #64748b;
-  padding-top: 4px;
+  font-size: 0.82rem;
+  color: #475569;
+  padding-top: 6px;
+  font-weight: 600;
 }
 
+/* 80mm Thermal Money Receipt */
+.money-receipt-thermal {
+  background: #ffffff;
+  width: 310px;
+  padding: 16px 12px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 0 auto;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+}
+.money-receipt-thermal .th-center { text-align: center; }
+.money-receipt-thermal .th-sep { color: #64748b; margin: 5px 0; text-align: center; }
+.money-receipt-thermal .th-row { display: flex; justify-content: space-between; margin: 3px 0; }
+.money-receipt-thermal .th-total {
+  font-size: 14px;
+  font-weight: 700;
+  border-top: 1px dashed #334155;
+  border-bottom: 1px dashed #334155;
+  padding: 5px 0;
+  margin: 5px 0;
+}
+
+/* ============================================================
+   Print Media Styles (Invoices & Money Receipts)
+   ============================================================ */
 @media print {
-  body * { visibility: hidden; }
-  .invoice-a4, .invoice-thermal, .invoice-a4 *, .invoice-thermal *,
-  .money-receipt-card, .money-receipt-card * { visibility: visible; }
-  .invoice-a4, .invoice-thermal, .money-receipt-card { position: absolute; left: 0; top: 0; width: 100%; border: none; box-shadow: none; }
-  .invoice-thermal { width: 76mm; font-size: 12px; }
-  .invoice-a4 { padding: 0; }
-  .no-print { display: none !important; }
-  @page { margin: 10mm; }
+  @page {
+    margin: 10mm;
+    size: auto;
+  }
+
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Universal hide for non-printable UI */
+  .no-print,
+  .sidebar,
+  .ambient-blobs,
+  .btn-row,
+  .modal-head,
+  .modal-foot,
+  button,
+  nav {
+    display: none !important;
+  }
+
+  /* When printing from Money Receipt Modal */
+  body.has-money-receipt-modal #root,
+  body:has(#money-receipt-portal) #root {
+    display: none !important;
+  }
+
+  body.has-money-receipt-modal,
+  body:has(#money-receipt-portal) {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #money-receipt-portal {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  #money-receipt-portal .modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  #money-receipt-portal .modal-box {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    animation: none !important;
+  }
+
+  .money-receipt-card {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 680px !important;
+    margin: 0 auto !important;
+    padding: 24px 28px !important;
+    border: 1.5px solid #0f172a !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .money-receipt-box {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .money-receipt-row.highlight {
+    border-top: 1.5px solid #0f172a !important;
+    border-bottom: 1.5px solid #0f172a !important;
+    color: #000000 !important;
+  }
+
+  .money-receipt-thermal {
+    position: static !important;
+    display: block !important;
+    width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-inside: avoid;
+  }
+
+  /* When printing Invoices */
+  .app {
+    display: block !important;
+    background: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .content {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .invoice-a4 {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  .invoice-thermal {
+    position: static !important;
+    display: block !important;
+    width: 76mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
 }
 
 @media (max-width: 1000px) {
