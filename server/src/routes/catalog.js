@@ -200,15 +200,22 @@ r.get('/stock/export.csv', requirePermission('stock.manage'), (req, res) => {
 
 // Categories
 r.get('/categories', (req, res) => {
-  res.json(db.prepare('SELECT * FROM categories ORDER BY name').all());
+  const list = db.prepare(`
+    SELECT c.*,
+      COALESCE((SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.active = 1), 0) AS product_count
+    FROM categories c
+    ORDER BY c.name
+  `).all();
+  res.json(list);
 });
 
 r.post('/categories', requirePermission('product.manage'), (req, res) => {
   const { name } = req.body || {};
-  if (!name) return res.status(400).json({ error: 'name required' });
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (!trimmed) return res.status(400).json({ error: 'Category name is required' });
   try {
-    const info = db.prepare('INSERT INTO categories (name) VALUES (?)').run(name);
-    res.json({ id: info.lastInsertRowid });
+    const info = db.prepare('INSERT INTO categories (name, active) VALUES (?, 1)').run(trimmed);
+    res.json({ id: info.lastInsertRowid, name: trimmed, active: 1, product_count: 0 });
   } catch {
     res.status(409).json({ error: 'Category already exists' });
   }
@@ -216,9 +223,44 @@ r.post('/categories', requirePermission('product.manage'), (req, res) => {
 
 r.put('/categories/:id', requirePermission('product.manage'), (req, res) => {
   const { name, active } = req.body || {};
-  if (name) db.prepare('UPDATE categories SET name = ? WHERE id = ?').run(name, req.params.id);
-  if (active !== undefined) db.prepare('UPDATE categories SET active = ? WHERE id = ?').run(active ? 1 : 0, req.params.id);
-  res.json({ ok: true });
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
+  if (!cat) return res.status(404).json({ error: 'Category not found' });
+
+  if (name !== undefined) {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (!trimmed) return res.status(400).json({ error: 'Category name cannot be empty' });
+    try {
+      db.prepare('UPDATE categories SET name = ? WHERE id = ?').run(trimmed, req.params.id);
+    } catch {
+      return res.status(409).json({ error: 'Category with this name already exists' });
+    }
+  }
+  if (active !== undefined) {
+    db.prepare('UPDATE categories SET active = ? WHERE id = ?').run(active ? 1 : 0, req.params.id);
+  }
+
+  const updated = db.prepare(`
+    SELECT c.*,
+      COALESCE((SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.active = 1), 0) AS product_count
+    FROM categories c
+    WHERE c.id = ?
+  `).get(req.params.id);
+  res.json(updated);
+});
+
+r.delete('/categories/:id', requirePermission('product.manage'), (req, res) => {
+  const cat = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
+  if (!cat) return res.status(404).json({ error: 'Category not found' });
+
+  const inUse = db.prepare('SELECT COUNT(*) AS c FROM products WHERE category_id = ?').get(req.params.id).c;
+  if (inUse > 0) {
+    return res.status(400).json({
+      error: `Cannot delete "${cat.name}" because ${inUse} product(s) are assigned to it. Please reassign those products or deactivate this category instead.`
+    });
+  }
+
+  db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
+  res.json({ ok: true, message: `Category "${cat.name}" deleted successfully.` });
 });
 
 // Customers
