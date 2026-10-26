@@ -912,6 +912,7 @@ tr.cancelled td {
 }
 
 .modal-wide { max-width: 880px; }
+.modal-xl { max-width: 1040px; }
 
 .modal-head {
   display: flex;
@@ -932,6 +933,138 @@ tr.cancelled td {
   padding-top: 18px;
   margin-top: 24px;
 }
+
+/* ============================================================
+   Installments & Customer Ledger
+   ============================================================ */
+.installment-card {
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.7), rgba(245, 243, 255, 0.7));
+  border: 1px solid rgba(199, 210, 254, 0.8);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 12px 0;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.06);
+  animation: cardFadeIn 0.25s ease-out;
+}
+
+.installment-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #312e81;
+  margin-bottom: 10px;
+}
+
+.pill-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.pill-btn {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(199, 210, 254, 0.9);
+  background: rgba(255, 255, 255, 0.85);
+  color: #4338ca;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.pill-btn:hover {
+  background: #e0e7ff;
+  border-color: #6366f1;
+  transform: translateY(-1px);
+}
+
+.pill-btn.active {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+}
+
+.installment-preview {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  color: #1e1b4b;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.installment-preview-amt {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #4338ca;
+}
+
+.ledger-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.ledger-stat-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.ledger-stat-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.ledger-stat-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+
+.ledger-stat-val.warn {
+  color: #dc2626;
+}
+
+.ledger-badge-debit {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ledger-badge-credit {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 
 .form-grid {
   display: grid;

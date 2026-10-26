@@ -88,6 +88,26 @@ export default function Invoice() {
             {sale.change_given > 0 && <div><span>Change</span><span>{fmtMoney(sale.change_given)}</span></div>}
             <div><span>Payment method</span><span>{sale.payments.map(p => p.method).join(', ') || '—'}</span></div>
           </div>
+
+          {sale.installment_plan && (
+            <div style={{ marginTop: '16px', padding: '12px 14px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
+              <div style={{ fontWeight: 700, color: '#312e81', marginBottom: '3px' }}>📅 Installment Payment Plan</div>
+              <div>
+                <strong>{sale.installment_plan.total_installments}</strong> installments of <strong>{fmtMoney(sale.installment_plan.installment_amount)}</strong> ({sale.installment_plan.frequency})
+              </div>
+              {sale.installment_plan.next_due_date && (
+                <div className="muted" style={{ fontSize: '0.84rem', marginTop: '2px' }}>
+                  Next payment due date: <strong>{fmtDate(sale.installment_plan.next_due_date)}</strong>
+                </div>
+              )}
+              {sale.installment_plan.notes && (
+                <div className="muted" style={{ fontSize: '0.82rem', marginTop: '2px' }}>
+                  Terms / Note: {sale.installment_plan.notes}
+                </div>
+              )}
+            </div>
+          )}
+
           {s.warranty_terms && (
             <div className="inv-terms muted">
               <strong>Warranty & Return Policy:</strong>
@@ -129,6 +149,14 @@ export default function Invoice() {
           {sale.due > 0 && <div>DUE: {fmtMoney(sale.due)}</div>}
           {sale.change_given > 0 && <div>Change: {fmtMoney(sale.change_given)}</div>}
           <div>Method: {sale.payments.map(p => p.method).join(', ')}</div>
+          {sale.installment_plan && (
+            <div>
+              <div className="th-sep">--------------------------------</div>
+              <div style={{ fontWeight: 'bold' }}>INSTALLMENT PLAN:</div>
+              <div>{sale.installment_plan.total_installments}x {fmtMoney(sale.installment_plan.installment_amount)} ({sale.installment_plan.frequency})</div>
+              {sale.installment_plan.next_due_date && <div>Next Due: {fmtDate(sale.installment_plan.next_due_date)}</div>}
+            </div>
+          )}
           <div className="th-sep">--------------------------------</div>
           <div className="th-center">{s.warranty_terms || ''}</div>
           <div className="th-center" style={{ marginTop: '6px' }}>Thank you for your business!</div>

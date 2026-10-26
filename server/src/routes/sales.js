@@ -152,6 +152,10 @@ r.post('/sales', requirePermission('sale.create'), (req, res) => {
       insertMove.run(l.product.id, -l.qty, saleId, req.user.id); // stock out, exactly once (PRD 19.1)
     }
 
+    if (customer.id === 1 && due > 0) {
+      throw Object.assign(new Error('Cannot leave due balance for Walk-in Customer. Please select or add a registered customer.'), { status: 400 });
+    }
+
     const insertPay = db.prepare(`INSERT INTO payments (sale_id, customer_id, method, amount, kind, user_id)
       VALUES (?, ?, ?, ?, 'sale', ?)`);
     if (cashApplied > 0) insertPay.run(saleId, customer.id, 'cash', cashApplied, req.user.id);
@@ -159,7 +163,41 @@ r.post('/sales', requirePermission('sale.create'), (req, res) => {
       if (p.method !== 'cash') insertPay.run(saleId, customer.id, p.method, toMinor(p.amount), req.user.id);
     }
 
-    return { id: saleId, invoice_no: invoiceNo, total: fromMinor(total), due: fromMinor(due), change: fromMinor(change) };
+    // Save installment plan if remaining due is split into installments
+    let installmentRecord = null;
+    if (due > 0 && b.installment_plan && b.installment_plan.total_installments > 1) {
+      const plan = b.installment_plan;
+      const count = parseInt(plan.total_installments, 10) || 1;
+      const instAmt = Math.round(due / count);
+      const insInfo = db.prepare(`INSERT INTO sale_installments
+        (sale_id, customer_id, total_installments, installment_amount, frequency, next_due_date, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+        saleId,
+        customer.id,
+        count,
+        instAmt,
+        plan.frequency || 'monthly',
+        plan.next_due_date || null,
+        plan.notes || ''
+      );
+      installmentRecord = {
+        id: insInfo.lastInsertRowid,
+        total_installments: count,
+        installment_amount: fromMinor(instAmt),
+        frequency: plan.frequency || 'monthly',
+        next_due_date: plan.next_due_date || null
+      };
+    }
+
+    return {
+      id: saleId,
+      invoice_no: invoiceNo,
+      total: fromMinor(total),
+      paid: fromMinor(paid),
+      due: fromMinor(due),
+      change: fromMinor(change),
+      installment_plan: installmentRecord
+    };
   })();
 
   res.json(result);
@@ -211,6 +249,7 @@ r.get('/sales/:id', (req, res) => {
     };
   });
   const pays = db.prepare('SELECT * FROM payments WHERE sale_id = ?').all(s.id);
+  const instPlan = db.prepare('SELECT * FROM sale_installments WHERE sale_id = ?').get(s.id);
   const settings = {};
   for (const row of db.prepare('SELECT key, value FROM settings').all()) settings[row.key] = row.value;
   if (!req.user || req.user.role !== 'admin') { /* cost hidden from cashiers on invoice */ }
@@ -221,6 +260,10 @@ r.get('/sales/:id', (req, res) => {
     total: fromMinor(s.total), paid: fromMinor(s.paid), due: fromMinor(s.due), change_given: fromMinor(s.change_given),
     items,
     payments: pays.map(p => ({ ...p, amount: fromMinor(p.amount) })),
+    installment_plan: instPlan ? {
+      ...instPlan,
+      installment_amount: fromMinor(instPlan.installment_amount)
+    } : null,
     settings
   });
 });

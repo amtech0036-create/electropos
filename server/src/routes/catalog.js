@@ -261,34 +261,104 @@ r.post('/customers', (req, res) => {
 r.get('/customers/:id', (req, res) => {
   const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Customer not found' });
-  const sales = db.prepare(`SELECT id, invoice_no, total, paid, due, status, created_at FROM sales
-    WHERE customer_id = ? ORDER BY id DESC`).all(c.id);
-  const payments = db.prepare(`SELECT id, method, amount, kind, created_at FROM payments
-    WHERE customer_id = ? ORDER BY id DESC`).all(c.id);
+
+  const sales = db.prepare(`SELECT s.*, si.total_installments, si.installment_amount, si.frequency, si.next_due_date, si.notes AS installment_notes
+    FROM sales s
+    LEFT JOIN sale_installments si ON si.sale_id = s.id
+    WHERE s.customer_id = ? ORDER BY s.id DESC`).all(c.id);
+
+  const payments = db.prepare(`SELECT p.*, s.invoice_no
+    FROM payments p
+    LEFT JOIN sales s ON s.id = p.sale_id
+    WHERE p.customer_id = ? ORDER BY p.id DESC`).all(c.id);
+
   const totals = db.prepare(`SELECT
     COALESCE((SELECT SUM(total) FROM sales WHERE customer_id = ? AND status='completed'), 0) AS tp,
     COALESCE((SELECT SUM(amount) FROM payments WHERE customer_id = ?), 0) AS tpay`).get(c.id, c.id);
+
+  // Build unified chronological statement ledger (PRD §8)
+  const events = [];
+  for (const s of sales) {
+    if (s.status === 'completed') {
+      let notes = s.notes || '';
+      if (s.total_installments > 1) {
+        notes = `${s.total_installments} Installments (${fromMinor(s.installment_amount)}/${s.frequency}) ${notes ? '· ' + notes : ''}`;
+      }
+      events.push({
+        date: s.created_at,
+        type: 'sale',
+        reference: s.invoice_no,
+        notes: notes.trim(),
+        debit: fromMinor(s.total),  // Billed amount increases customer debt
+        credit: 0,
+        sale_id: s.id
+      });
+    }
+  }
+
+  for (const p of payments) {
+    events.push({
+      date: p.created_at,
+      type: p.kind === 'collection' ? 'collection' : 'payment',
+      reference: p.invoice_no ? `${p.invoice_no} (${p.method})` : `Due Collection (${p.method})`,
+      notes: p.notes || '',
+      debit: 0,
+      credit: fromMinor(p.amount), // Payment decreases customer debt
+      payment_id: p.id
+    });
+  }
+
+  // Chronological sort ascending for running balance calculation
+  events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  let runningDue = 0;
+  for (const ev of events) {
+    runningDue += (ev.debit - ev.credit);
+    ev.balance = runningDue;
+  }
+  // Reverse to show most recent at the top
+  const ledger = [...events].reverse();
+
   res.json({
     ...c,
     total_purchases: fromMinor(totals.tp),
     total_payments: fromMinor(totals.tpay),
     outstanding_due: fromMinor(totals.tp - totals.tpay),
-    sales: sales.map(s => ({ ...s, total: fromMinor(s.total), paid: fromMinor(s.paid), due: fromMinor(s.due) })),
-    payments: payments.map(p => ({ ...p, amount: fromMinor(p.amount) }))
+    sales: sales.map(s => ({
+      ...s,
+      total: fromMinor(s.total),
+      paid: fromMinor(s.paid),
+      due: fromMinor(s.due),
+      installment_amount: s.installment_amount ? fromMinor(s.installment_amount) : undefined
+    })),
+    payments: payments.map(p => ({ ...p, amount: fromMinor(p.amount) })),
+    ledger
   });
 });
 
 // Record a due collection from customer (reduces due, does not create a sale — PRD 19.4)
 r.post('/customers/:id/collections', requirePermission('payment.collect'), (req, res) => {
-  const { amount, method = 'cash' } = req.body || {};
+  const { amount, method = 'cash', notes = '', sale_id } = req.body || {};
   const minor = toMinor(amount);
-  if (!minor || minor <= 0) return res.status(400).json({ error: 'amount must be positive' });
-  if (!['cash', 'bkash', 'nagad', 'card', 'bank'].includes(method)) return res.status(400).json({ error: 'Invalid method' });
+  if (!minor || minor <= 0) return res.status(400).json({ error: 'Payment amount must be positive' });
+  if (!['cash', 'bkash', 'nagad', 'card', 'bank'].includes(method)) return res.status(400).json({ error: 'Invalid payment method' });
   const c = db.prepare('SELECT * FROM customers WHERE id = ?').get(req.params.id);
   if (!c) return res.status(404).json({ error: 'Customer not found' });
-  db.prepare(`INSERT INTO payments (customer_id, method, amount, kind, user_id) VALUES (?, ?, ?, 'collection', ?)`)
-    .run(c.id, method, minor, req.user.id);
-  res.json({ ok: true });
+
+  db.transaction(() => {
+    db.prepare(`INSERT INTO payments (sale_id, customer_id, method, amount, kind, user_id, notes)
+      VALUES (?, ?, ?, ?, 'collection', ?, ?)`).run(sale_id || null, c.id, method, minor, req.user.id, notes || '');
+
+    // If linked to an invoice, reduce its due balance
+    if (sale_id) {
+      const s = db.prepare('SELECT id, paid, due FROM sales WHERE id = ? AND customer_id = ?').get(sale_id, c.id);
+      if (s) {
+        const applyAmt = Math.min(minor, s.due);
+        db.prepare('UPDATE sales SET paid = paid + ?, due = due - ? WHERE id = ?').run(applyAmt, applyAmt, s.id);
+      }
+    }
+  })();
+
+  res.json({ ok: true, message: 'Due payment successfully collected.' });
 });
 
 export { r as apiRouter };

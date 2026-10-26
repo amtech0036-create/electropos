@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, fmtMoney } from '../api.js';
+import CustomerLedgerModal from '../components/CustomerLedgerModal.jsx';
 
 export default function POS() {
   const nav = useNavigate();
@@ -10,6 +11,7 @@ export default function POS() {
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState(1);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [showLedgerCustId, setShowLedgerCustId] = useState(null);
   const [newCust, setNewCust] = useState({ name: '', phone: '', address: '' });
   const [custSaving, setCustSaving] = useState(false);
   const [custError, setCustError] = useState('');
@@ -21,6 +23,18 @@ export default function POS() {
   const [done, setDone] = useState(null); // completed sale summary
   const [serialsCache, setSerialsCache] = useState({}); // productId -> available in_stock serials[]
   const searchRef = useRef(null);
+
+  // Installment plan configuration
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState(3);
+  const [installmentFreq, setInstallmentFreq] = useState('monthly');
+  const [nextDueDate, setNextDueDate] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [installmentNotes, setInstallmentNotes] = useState('');
+
   // Idempotency key per cart session — regenerated after each completed sale
   const [idemKey, setIdemKey] = useState(() => crypto.randomUUID());
 
@@ -192,6 +206,11 @@ export default function POS() {
   async function confirmSale() {
     if (cart.length === 0) { setError('Cart is empty'); return; }
 
+    if (due > 0 && customerId === 1) {
+      setError('Cannot leave due balance for Walk-in Customer. Please select or add a registered customer.');
+      return;
+    }
+
     // Validate serial selection for serialized lines
     for (const line of cart) {
       if (line.product.tracking_type === 'serial') {
@@ -222,10 +241,17 @@ export default function POS() {
         })),
         payments: paid > 0 ? [{ method, amount: paid }] : [],
         invoice_discount: invDisc,
+        installment_plan: (due > 0 && isInstallment && installmentCount > 1) ? {
+          total_installments: installmentCount,
+          frequency: installmentFreq,
+          next_due_date: nextDueDate,
+          notes: installmentNotes.trim()
+        } : undefined,
         idempotency_key: idemKey
       });
-      setDone(result);
+      setDone({ ...result, customer_id: customerId });
       setCart([]); setInvoiceDiscount(0); setPaidAmount(''); setCustomerId(1);
+      setIsInstallment(false); setInstallmentNotes('');
       setIdemKey(crypto.randomUUID());
     } catch (err) {
       setError(err.message);
@@ -234,7 +260,15 @@ export default function POS() {
     }
   }
 
-  function reset() { setDone(null); setCart([]); setPaidAmount(''); setError(''); searchRef.current?.focus(); }
+  function reset() {
+    setDone(null);
+    setCart([]);
+    setPaidAmount('');
+    setError('');
+    setIsInstallment(false);
+    setInstallmentNotes('');
+    searchRef.current?.focus();
+  }
 
   if (done) {
     return (
@@ -242,11 +276,42 @@ export default function POS() {
         <h2>✓ Sale complete</h2>
         <p>Invoice <strong>{done.invoice_no}</strong></p>
         <p>Total: <strong>{fmtMoney(done.total)}</strong></p>
+        {done.paid > 0 && <p style={{ color: '#16a34a' }}>Paid: {fmtMoney(done.paid)}</p>}
         {done.due > 0 && <p className="warn">Due: {fmtMoney(done.due)}</p>}
-        <div className="btn-row">
+
+        {done.installment_plan && (
+          <div style={{ margin: '14px 0', padding: '12px 16px', background: 'rgba(238, 242, 255, 0.85)', border: '1px solid #c7d2fe', borderRadius: '12px', textAlign: 'left' }}>
+            <div style={{ fontWeight: 700, color: '#312e81', marginBottom: '4px' }}>📅 Installment Plan Activated</div>
+            <div>
+              <strong>{done.installment_plan.total_installments}</strong> installments of <strong>{fmtMoney(done.installment_plan.installment_amount)}</strong> ({done.installment_plan.frequency})
+            </div>
+            {done.installment_plan.next_due_date && (
+              <div className="muted" style={{ fontSize: '0.84rem', marginTop: '2px' }}>
+                First installment due: <strong>{done.installment_plan.next_due_date}</strong>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="btn-row" style={{ marginTop: '16px' }}>
           <button className="btn btn-primary" onClick={() => nav(`/sales/${done.id}`)}>Print invoice</button>
+          {done.customer_id && done.customer_id !== 1 && (
+            <button className="btn" onClick={() => setShowLedgerCustId(done.customer_id)}>
+              📋 Customer Ledger & Collect
+            </button>
+          )}
           <button className="btn" onClick={reset}>New sale</button>
         </div>
+
+        {showLedgerCustId && (
+          <CustomerLedgerModal
+            customerId={showLedgerCustId}
+            onClose={() => setShowLedgerCustId(null)}
+            onPaymentCollected={() => {
+              api.get('/api/customers').then(setCustomers).catch(() => {});
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -374,15 +439,28 @@ export default function POS() {
           </select>
         </label>
         {customers.find(c => c.id === customerId)?.phone && (
-          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '-6px', marginBottom: '8px' }}>
+          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '-6px', marginBottom: '6px' }}>
             📞 {customers.find(c => c.id === customerId).phone}
           </div>
         )}
-        <button type="button" className="btn btn-link" onClick={() => {
-          setNewCust({ name: '', phone: '', address: '' });
-          setCustError('');
-          setShowAddCustomer(true);
-        }}>＋ Quick add customer</button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-link" style={{ padding: 0 }} onClick={() => {
+            setNewCust({ name: '', phone: '', address: '' });
+            setCustError('');
+            setShowAddCustomer(true);
+          }}>＋ Quick add customer</button>
+
+          {customerId !== 1 && (
+            <button
+              type="button"
+              className="btn btn-link"
+              style={{ padding: 0, color: '#4f46e5', fontWeight: 600 }}
+              onClick={() => setShowLedgerCustId(customerId)}
+            >
+              📋 Customer Ledger & Collect
+            </button>
+          )}
+        </div>
 
         <label>Invoice discount (৳)
           <input type="number" min="0" step="0.01" value={invoiceDiscount} onChange={e => setInvoiceDiscount(parseFloat(e.target.value) || 0)} />
@@ -410,8 +488,112 @@ export default function POS() {
         {due > 0 && <div className="due-line warn">Due: {fmtMoney(due)}</div>}
         {paid > total && <div className="muted">Change: {fmtMoney(paid - total)}</div>}
 
+        {/* Warning if Walk-in customer has due */}
+        {due > 0 && customerId === 1 && (
+          <div className="error" style={{ margin: '8px 0', fontSize: '0.84rem', lineHeight: '1.4' }}>
+            ⚠️ Walk-in customer cannot have unpaid due or installments. Please select or quick-add a registered customer above.
+          </div>
+        )}
+
+        {/* Installment Plan configuration when due > 0 and registered customer selected */}
+        {due > 0 && customerId !== 1 && (
+          <div className="installment-card">
+            <div className="installment-title">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={isInstallment}
+                  onChange={e => setIsInstallment(e.target.checked)}
+                  style={{ width: 'auto', margin: 0 }}
+                />
+                <span>📅 Pay Remaining Due in Installments</span>
+              </label>
+            </div>
+
+            {isInstallment && (
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '4px' }}>
+                  Number of Installments:
+                </div>
+                <div className="pill-group">
+                  {[2, 3, 4, 6, 12].map(n => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`pill-btn ${installmentCount === n ? 'active' : ''}`}
+                      onClick={() => setInstallmentCount(n)}
+                    >
+                      {n}x
+                    </button>
+                  ))}
+                  <input
+                    type="number"
+                    min="2"
+                    max="60"
+                    value={installmentCount}
+                    onChange={e => setInstallmentCount(Math.max(2, parseInt(e.target.value, 10) || 2))}
+                    style={{ width: '60px', padding: '3px 6px', fontSize: '0.82rem', margin: 0 }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '6px' }}>
+                  <label style={{ margin: 0 }}>
+                    Frequency
+                    <select
+                      value={installmentFreq}
+                      onChange={e => setInstallmentFreq(e.target.value)}
+                      style={{ margin: 0 }}
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Bi-weekly</option>
+                    </select>
+                  </label>
+
+                  <label style={{ margin: 0 }}>
+                    First Due Date
+                    <input
+                      type="date"
+                      value={nextDueDate}
+                      onChange={e => setNextDueDate(e.target.value)}
+                      style={{ margin: 0 }}
+                    >
+                    </input>
+                  </label>
+                </div>
+
+                <div className="installment-preview">
+                  <div>Remaining Due: <strong>{fmtMoney(due)}</strong></div>
+                  <div>
+                    Schedule: <span className="installment-preview-amt">{installmentCount}x {fmtMoney(Math.round(due / installmentCount))}</span> / {installmentFreq}
+                  </div>
+                  {nextDueDate && (
+                    <div className="muted" style={{ fontSize: '0.78rem' }}>
+                      First payment expected: {nextDueDate}
+                    </div>
+                  )}
+                </div>
+
+                <label style={{ marginTop: '8px', marginBottom: 0 }}>
+                  Installment Notes / Agreement
+                  <input
+                    placeholder="e.g. Guarantee check #, monthly schedule"
+                    value={installmentNotes}
+                    onChange={e => setInstallmentNotes(e.target.value)}
+                    style={{ margin: 0 }}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <div className="error">{error}</div>}
-        <button className="btn btn-primary btn-big" onClick={confirmSale} disabled={busy || cart.length === 0}>
+        <button
+          className="btn btn-primary btn-big"
+          onClick={confirmSale}
+          disabled={busy || cart.length === 0 || (due > 0 && customerId === 1)}
+        >
           {busy ? 'Saving…' : `Confirm sale — ${fmtMoney(total)}`}
         </button>
       </div>
@@ -494,6 +676,16 @@ export default function POS() {
             </form>
           </div>
         </div>
+      )}
+
+      {showLedgerCustId && (
+        <CustomerLedgerModal
+          customerId={showLedgerCustId}
+          onClose={() => setShowLedgerCustId(null)}
+          onPaymentCollected={() => {
+            api.get('/api/customers').then(setCustomers).catch(() => {});
+          }}
+        />
       )}
     </div>
   );

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { api, fmtMoney, fmtDate } from '../api.js';
+import { api, fmtMoney } from '../api.js';
 import { useAuth } from '../App.jsx';
+import CustomerLedgerModal from '../components/CustomerLedgerModal.jsx';
 
 export default function Customers() {
   const user = useAuth();
   const [customers, setCustomers] = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [activeCustId, setActiveCustId] = useState(null);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
 
@@ -18,11 +19,6 @@ export default function Customers() {
       .then(setCustomers).catch(e => setError(e.message));
   }
   useEffect(() => { load(); }, []);
-
-  async function open(c) {
-    const full = await api.get(`/api/customers/${c.id}`);
-    setSelected(full);
-  }
 
   async function handleAddCustomer(e) {
     e.preventDefault();
@@ -45,78 +41,97 @@ export default function Customers() {
     }
   }
 
-  async function collectDue(c) {
-    const amt = prompt(`Collect due from ${c.name} (৳):`);
-    if (!amt) return;
-    try {
-      await api.post(`/api/customers/${c.id}/collections`, { amount: parseFloat(amt), method: 'cash' });
-      load(q);
-      if (selected?.id === c.id) open(c);
-    } catch (e) { setError(e.message); }
-  }
-
   return (
     <div>
       <div className="page-head">
         <h1>Customers</h1>
-        <input placeholder="Search name / phone…" value={q}
-          onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && load(q)} />
-        <button className="btn" onClick={() => load(q)}>Search</button>
-        <button className="btn btn-primary" onClick={() => {
-          setForm({ name: '', phone: '', address: '' });
-          setError('');
-          setShowAddModal(true);
-        }}>＋ Add customer</button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            placeholder="Search name / phone…"
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && load(q)}
+            style={{ width: '220px', margin: 0 }}
+          />
+          <button className="btn" onClick={() => load(q)}>Search</button>
+          <button className="btn btn-primary" onClick={() => {
+            setForm({ name: '', phone: '', address: '' });
+            setError('');
+            setShowAddModal(true);
+          }}>＋ Add customer</button>
+        </div>
       </div>
       {error && <div className="error">{error}</div>}
 
-      <div className="two-col">
-        <div className="card">
+      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+        <div className="table-responsive">
           <table>
-            <thead><tr><th>Name</th><th>Phone</th><th className="num">Purchases</th><th className="num">Due</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Customer Name</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th className="num">Purchases</th>
+                <th className="num">Paid</th>
+                <th className="num">Balance Due</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              {customers.map(c => (
-                <tr key={c.id}>
-                  <td>{c.name}{c.is_walkin ? ' <small>(walk-in)</small>' : ''}</td>
-                  <td>{c.phone || '—'}</td>
-                  <td className="num">{fmtMoney(c.total_purchases)}</td>
-                  <td className="num">{c.outstanding_due > 0 ? <span className="warn">{fmtMoney(c.outstanding_due)}</span> : '—'}</td>
-                  <td>
-                    <button className="btn btn-link" onClick={() => open(c)}>Ledger</button>
-                    {c.outstanding_due > 0 && (user.role === 'admin' || user.role === 'cashier') &&
-                      <button className="btn btn-link" onClick={() => collectDue(c)}>Collect due</button>}
-                  </td>
-                </tr>
-              ))}
+              {customers.length === 0 ? (
+                <tr><td colSpan="7" className="muted" style={{ textAlign: 'center', padding: '24px' }}>No customers found.</td></tr>
+              ) : (
+                customers.map(c => (
+                  <tr key={c.id}>
+                    <td>
+                      <strong>{c.name}</strong>
+                      {c.is_walkin ? <span className="badge badge-draft" style={{ marginLeft: '6px', fontSize: '0.72rem' }}>Walk-in</span> : null}
+                    </td>
+                    <td>{c.phone || <span className="muted">—</span>}</td>
+                    <td>{c.address || <span className="muted">—</span>}</td>
+                    <td className="num">{fmtMoney(c.total_purchases)}</td>
+                    <td className="num" style={{ color: '#16a34a' }}>{fmtMoney(c.total_payments)}</td>
+                    <td className="num">
+                      {c.outstanding_due > 0 ? (
+                        <span className="warn" style={{ fontWeight: 700 }}>{fmtMoney(c.outstanding_due)}</span>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn btn-link"
+                        onClick={() => setActiveCustId(c.id)}
+                        style={{ fontWeight: 600 }}
+                      >
+                        📜 Ledger
+                      </button>
+                      {c.outstanding_due > 0 && (user.role === 'admin' || user.role === 'cashier') && (
+                        <button
+                          className="btn btn-link"
+                          style={{ color: '#16a34a', fontWeight: 600, marginLeft: '6px' }}
+                          onClick={() => setActiveCustId(c.id)}
+                        >
+                          💳 Collect Due
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-
-        {selected && (
-          <div className="card">
-            <h3>{selected.name}{selected.phone ? ` ${selected.phone}` : ''} — ledger</h3>
-            <p className="muted">Purchases: {fmtMoney(selected.total_purchases)} · Payments: {fmtMoney(selected.total_payments)} · Due: <strong className="warn">{fmtMoney(selected.outstanding_due)}</strong></p>
-            <h4>Invoices</h4>
-            <table>
-              <thead><tr><th>Invoice</th><th>Date</th><th className="num">Total</th><th className="num">Due</th></tr></thead>
-              <tbody>
-                {selected.sales.map(s => (
-                  <tr key={s.id}><td>{s.invoice_no}</td><td className="muted">{fmtDate(s.created_at)}</td>
-                    <td className="num">{fmtMoney(s.total)}</td><td className="num">{s.due > 0 ? fmtMoney(s.due) : '—'}</td></tr>
-                ))}
-              </tbody>
-            </table>
-            <h4>Payments</h4>
-            <table>
-              <tbody>
-                {selected.payments.map(p => (
-                  <tr key={p.id}><td className="muted">{fmtDate(p.created_at)}</td><td>{p.kind}</td><td>{p.method}</td><td className="num">{fmtMoney(p.amount)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
+
+      {activeCustId && (
+        <CustomerLedgerModal
+          customerId={activeCustId}
+          onClose={() => setActiveCustId(null)}
+          onPaymentCollected={() => load(q)}
+        />
+      )}
+
 
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>

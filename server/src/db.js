@@ -278,6 +278,29 @@ try {
   // column already exists
 }
 
+// Installment tracking for due sales
+db.exec(`
+CREATE TABLE IF NOT EXISTS sale_installments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER NOT NULL REFERENCES sales(id),
+  customer_id INTEGER NOT NULL REFERENCES customers(id),
+  total_installments INTEGER NOT NULL DEFAULT 1,
+  installment_amount INTEGER NOT NULL,
+  frequency TEXT NOT NULL DEFAULT 'monthly',
+  next_due_date TEXT,
+  notes TEXT DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
+
+try {
+  db.exec("ALTER TABLE payments ADD COLUMN notes TEXT DEFAULT ''");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE payments ADD COLUMN transaction_ref TEXT DEFAULT ''");
+} catch (e) {}
+
 const seedCategories = db.prepare(`INSERT OR IGNORE INTO categories (name) VALUES (?)`);
 const defaults = [
   'Mobile Phones','Laptops','Desktop Computers','Monitors','Printers and Scanners',
