@@ -116,6 +116,16 @@ export default function Invoice() {
               <div>{s.warranty_terms}</div>
             </div>
           )}
+
+          {/* Agency Branding Footer 1 inch above */}
+          <div className="inv-dev-footer">
+            <span>For Custom Software & Website — </span>
+            <a href="https://amtechsolutionsbd.com" target="_blank" rel="noopener noreferrer">
+              Amtechsolutionsbd.com
+            </a>
+            <span style={{ margin: '0 6px' }}>·</span>
+            <span>Phone: 01736002401</span>
+          </div>
         </div>
       ) : (
         <div className="invoice-thermal">
@@ -163,6 +173,16 @@ export default function Invoice() {
           <div className="th-sep">--------------------------------</div>
           <div className="th-center">{s.warranty_terms || ''}</div>
           <div className="th-center" style={{ marginTop: '6px' }}>Thank you for your business!</div>
+
+          {/* Thermal Agency Branding 1 inch above */}
+          <div style={{ marginTop: '0.8in' }}>
+            <div className="th-sep">--------------------------------</div>
+            <div className="th-center" style={{ fontSize: '11px', color: '#475569' }}>
+              <div>For Custom Software & Website:</div>
+              <strong style={{ letterSpacing: '0.04em' }}>Amtechsolutionsbd.com</strong>
+              <div>Phone: 01736002401</div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1099,6 +1099,24 @@ tr.cancelled td {
 .inv-totals .grand { font-weight: 700; font-size: 1.15rem; font-family: var(--font-mono); border-top: 2px solid var(--text); }
 .inv-terms { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 10px; }
 
+/* Developer / Agency Footer 1 inch above */
+.inv-dev-footer {
+  margin-top: 1in;
+  text-align: center;
+  font-size: 0.84rem;
+  color: #64748b;
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 12px;
+}
+.inv-dev-footer a {
+  color: #4f46e5;
+  font-weight: 600;
+  text-decoration: none;
+}
+.inv-dev-footer a:hover {
+  text-decoration: underline;
+}
+
 .invoice-thermal {
   background: #fff;
   width: 302px;
@@ -1424,6 +1442,21 @@ tr.cancelled td {
     font-size: 12px !important;
     background: #ffffff !important;
     color: #000000 !important;
+  }
+
+  .inv-dev-footer {
+    margin-top: 1in !important;
+    text-align: center !important;
+    font-size: 11px !important;
+    color: #475569 !important;
+    border-top: 1px dashed #94a3b8 !important;
+    padding-top: 8px !important;
+    page-break-inside: avoid;
+  }
+  .inv-dev-footer a {
+    color: #0f172a !important;
+    text-decoration: none !important;
+    font-weight: 700 !important;
   }
 }
 
