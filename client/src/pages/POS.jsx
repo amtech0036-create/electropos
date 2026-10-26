@@ -27,6 +27,18 @@ export default function POS() {
   useEffect(() => { searchRef.current?.focus(); }, []);
   useEffect(() => { api.get('/api/customers').then(setCustomers).catch(() => {}); }, []);
 
+  // Auto-focus search input when a barcode is scanned anywhere on the POS screen
+  useEffect(() => {
+    function handleGlobalScan(e) {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        searchRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', handleGlobalScan);
+    return () => window.removeEventListener('keydown', handleGlobalScan);
+  }, []);
+
   // Fetch available in_stock serials for a product if serialized
   async function loadSerials(productId) {
     if (serialsCache[productId]) return serialsCache[productId];
@@ -105,9 +117,9 @@ export default function POS() {
     searchRef.current?.focus();
   }
 
-  // Barcode / IMEI scanner handler on Enter
+  // Barcode / IMEI scanner handler on Enter or F12
   async function onSearchKey(e) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'F12' || e.keyCode === 123) {
       e.preventDefault();
       const term = query.trim();
       if (!term) return;
@@ -129,10 +141,21 @@ export default function POS() {
         // continue to normal product match
       }
 
-      // 2. Exact barcode or top product match
-      if (results.length > 0) {
-        const exact = results.find(p => p.barcode === term);
-        addToCart(exact || results[0]);
+      // 2. Exact barcode or top product match (fallback to direct fetch if debounce hasn't completed)
+      let matches = results;
+      if (matches.length === 0) {
+        try {
+          matches = await api.get(`/api/products?q=${encodeURIComponent(term)}`);
+        } catch {
+          matches = [];
+        }
+      }
+
+      if (matches.length > 0) {
+        const exact = matches.find(p => p.barcode === term || p.sku === term);
+        addToCart(exact || matches[0]);
+      } else {
+        setError(`No product found matching "${term}"`);
       }
     }
   }

@@ -30,6 +30,23 @@ export default function App() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Intercept F12 and DevTools shortcuts triggered by barcode scanners or accidental presses
+  useEffect(() => {
+    const handleDevToolsShortcuts = (e) => {
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) {
+        e.preventDefault();
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleDevToolsShortcuts, true);
+    return () => window.removeEventListener('keydown', handleDevToolsShortcuts, true);
+  }, []);
+
   if (loading) return <div className="loading">Loading…</div>;
 
   if (!user) {
